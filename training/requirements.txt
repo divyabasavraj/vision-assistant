@@ -1,0 +1,5 @@
+ultralytics>=8.3
+pyyaml
+pytest
+onnx
+onnxruntime
