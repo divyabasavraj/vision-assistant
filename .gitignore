@@ -51,3 +51,6 @@ training/runs/
 # macOS
 .DS_Store
 __pycache__/
+
+# graphify knowledge graph (generated)
+graphify-out/
