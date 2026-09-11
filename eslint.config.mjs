@@ -12,6 +12,9 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Not our code: Python venv ships JS, graphify emits generated HTML/JSON.
+    "training/**",
+    "graphify-out/**",
   ]),
 ]);
 

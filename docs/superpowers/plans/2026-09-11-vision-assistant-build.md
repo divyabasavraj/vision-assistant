@@ -759,7 +759,7 @@ git commit -m "feat(model): first fine-tuned YOLO11n (n640_v1) exported to ONNX"
   - `class Assistant` with `start()`, `stop()`, `pauseNarration()`, `resumeNarration()`, `handleCommand(cmd: Command)`, `state: AssistantState`, `onState` callback
   - `type AssistantState = { status: "idle"|"starting"|"running"|"error"; caption: string; heard: string; listening: boolean; narrationPaused: boolean; error?: string; backend?: string; fps: number; boxes: Box[] }` (`Box` is defined in Task 6; until then declare `boxes: unknown[]` and fix in Task 6)
 
-- [ ] **Step 1: Failing tests for command parsing**
+- [x] **Step 1: Failing tests for command parsing**
 
 Create `tests/voiceCommands.test.ts`:
 ```ts
@@ -793,9 +793,9 @@ describe("parseCommand", () => {
 });
 ```
 
-- [ ] **Step 2: Run to verify it fails** — `npm test` → Expected: FAIL "Cannot find module '../lib/voiceCommands'".
+- [x] **Step 2: Run to verify it fails** — `npm test` → Expected: FAIL "Cannot find module '../lib/voiceCommands'".
 
-- [ ] **Step 3: Implement `lib/voiceCommands.ts`**
+- [x] **Step 3: Implement `lib/voiceCommands.ts`**
 
 ```ts
 /**
@@ -836,9 +836,9 @@ export function parseCommand(transcript: string, trigger: string = TRIGGER_WORD)
 }
 ```
 
-- [ ] **Step 4: Run tests** — `npm test` → Expected: `6 passed`.
+- [x] **Step 4: Run tests** — `npm test` → Expected: `6 passed`.
 
-- [ ] **Step 5: `lib/frameSource.ts`**
+- [x] **Step 5: `lib/frameSource.ts`**
 
 ```ts
 /**
@@ -893,7 +893,7 @@ export class CameraFrameSource implements FrameSource {
 }
 ```
 
-- [ ] **Step 6: `lib/speech.ts`**
+- [x] **Step 6: `lib/speech.ts`**
 
 ```ts
 /**
@@ -966,7 +966,7 @@ export function createRecognizer(opts: {
 }
 ```
 
-- [ ] **Step 7: `lib/listener.ts` — always-on trigger-word listener**
+- [x] **Step 7: `lib/listener.ts` — always-on trigger-word listener**
 
 ```ts
 /**
@@ -1024,7 +1024,7 @@ export function startWakeWordListener(opts: ListenerOptions): () => void {
 }
 ```
 
-- [ ] **Step 8: `lib/assistant.ts` v1 (camera + voice only; detection is added in Task 6)**
+- [x] **Step 8: `lib/assistant.ts` v1 (camera + voice only; detection is added in Task 6)**
 
 ```ts
 /**
@@ -1117,7 +1117,7 @@ export class Assistant {
 }
 ```
 
-- [ ] **Step 9: Components**
+- [x] **Step 9: Components**
 
 `components/Caption.tsx`:
 ```tsx
@@ -1212,7 +1212,7 @@ export function TalkButton({ onQuestion, disabled }: { onQuestion: (q: string) =
 }
 ```
 
-- [ ] **Step 10: Page and layout**
+- [x] **Step 10: Page and layout**
 
 Replace `app/page.tsx`:
 ```tsx
@@ -1273,7 +1273,7 @@ npm run dev -- --hostname 0.0.0.0 --experimental-https
 ```
 Open the printed `https://<mac-ip>:3000` on the phone (accept the self-signed certificate). Expected: Start → camera appears → hears "camera ready" → say "vision, what is this" → caption shows "you asked: what is this" and the phone speaks it. Say "vision pause" → "paused". Note which browser you used (Chrome on Android is the best supported; iOS Safari's continuous recognition stops more often — check `restarts` counter).
 
-- [ ] **Step 12: Lint, test, commit**
+- [x] **Step 12: Lint, test, commit**
 
 ```bash
 npm run lint && npm test && git add -A && git commit -m "feat(app): camera FrameSource, TTS, always-on trigger-word listener, start screen"
