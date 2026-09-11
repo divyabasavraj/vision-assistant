@@ -82,7 +82,7 @@ PROJECT FINAL/
 **Files:**
 - Create: Next.js scaffold (via CLI), `vitest.config.ts`, `.gitignore` additions, `docs/journal/TEMPLATE.md`, `docs/journal/2026-09-11.md`, `docs/viva-prep.md`, `training/requirements.txt`, `README.md`
 
-- [ ] **Step 1: Init git and scaffold Next.js in the current folder**
+- [x] **Step 1: Init git and scaffold Next.js in the current folder**
 
 ```bash
 cd "/Users/divyabasavraj/projects all/PROJECT FINAL"
@@ -96,14 +96,14 @@ rsync -a --exclude node_modules /tmp/va-scaffold/ "/Users/divyabasavraj/projects
 npm install
 ```
 
-- [ ] **Step 2: Add test + runtime dependencies**
+- [x] **Step 2: Add test + runtime dependencies**
 
 ```bash
 npm install onnxruntime-web ai @ai-sdk/google @ai-sdk/groq zod
 npm install -D vitest
 ```
 
-- [ ] **Step 3: Vitest config and test script**
+- [x] **Step 3: Vitest config and test script**
 
 Create `vitest.config.ts`:
 ```ts
@@ -119,7 +119,7 @@ export default defineConfig({
 ```
 Add to `package.json` scripts: `"test": "vitest run"`, `"test:watch": "vitest"`.
 
-- [ ] **Step 4: Smoke test that Vitest runs**
+- [x] **Step 4: Smoke test that Vitest runs**
 
 Create `tests/smoke.test.ts`:
 ```ts
@@ -128,7 +128,7 @@ describe("vitest", () => { it("runs", () => { expect(1 + 1).toBe(2); }); });
 ```
 Run: `npm test` → Expected: `1 passed`. Then delete `tests/smoke.test.ts`.
 
-- [ ] **Step 5: gitignore training junk, keep the deployed model**
+- [x] **Step 5: gitignore training junk, keep the deployed model**
 
 Append to `.gitignore`:
 ```
@@ -141,7 +141,7 @@ training/runs/
 .env*.local
 ```
 
-- [ ] **Step 6: Python env for training scripts**
+- [x] **Step 6: Python env for training scripts**
 
 Create `training/requirements.txt`:
 ```
@@ -159,7 +159,7 @@ python -c "import ultralytics, torch; print(ultralytics.__version__, torch.backe
 ```
 Expected: version printed and `True` (MPS = Apple GPU available).
 
-- [ ] **Step 7: Journal template, first entry, viva file**
+- [x] **Step 7: Journal template, first entry, viva file**
 
 Create `docs/journal/TEMPLATE.md`:
 ```markdown
@@ -201,7 +201,7 @@ The core deliverable is a neural network (YOLO11n) that I trained further on my 
 Cloud vision models take 2–4 s per call and are rate-limited, useless for walking. A nano model on the phone gives results in under 100 ms and costs nothing. Each model does what it is good at.
 ```
 
-- [ ] **Step 8: README and commit**
+- [x] **Step 8: README and commit**
 
 Create `README.md` with the one-sentence goal, how to run (`npm run dev`), how to test (`npm test`), and links to the spec, plan, journal and viva files.
 ```bash
@@ -221,7 +221,7 @@ git commit -m "chore: scaffold Next.js app, vitest, python env, journal + viva f
 **Interfaces:**
 - Produces: `TARGET_CLASSES: list[str]`, `remap_label_line(line, source_names, mapping) -> str | None`, `split_name(index, n, seed) -> "train"|"val"|"test"`, `merge(raw_dir, mappings_dir, out_dir, seed) -> dict` (per-class, per-split counts), `training/data/merged/data.yaml`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Create `training/tests/test_merge.py`:
 ```python
@@ -290,12 +290,12 @@ def test_merge_remaps_dedupes_and_writes_yaml(tmp_path: Path):
     assert total_stairs == 2
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `source training/.venv/bin/activate && pytest training/tests/test_merge.py -q`
 Expected: FAIL with `ModuleNotFoundError: No module named 'merge_datasets'`.
 
-- [ ] **Step 3: Write the merge script**
+- [x] **Step 3: Write the merge script**
 
 Create `training/scripts/merge_datasets.py`:
 ```python
@@ -440,11 +440,11 @@ if __name__ == "__main__":
     main()
 ```
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `pytest training/tests/test_merge.py -q` → Expected: `4 passed`.
 
-- [ ] **Step 5: Mapping instructions**
+- [x] **Step 5: Mapping instructions**
 
 Create `training/mappings/README.md`:
 ```markdown
@@ -456,7 +456,7 @@ Example — training/mappings/stairs-v3.json:
 { "Stair Up": "stairs_up", "Stair Down": "stairs_down", "Person": "person" }
 ```
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add training/scripts/merge_datasets.py training/tests/test_merge.py training/mappings/README.md
@@ -510,7 +510,7 @@ git commit -m "data: dataset mappings, final class list, day-1 journal"
 - Consumes: `TARGET_CLASSES` from Task 2, `training/data/merged/`.
 - Produces: `OURS_TO_COCO: dict[str,str]`, `remap_to_coco_line(line, our_names, coco_names) -> str | None`, `training/data/baseline/data.yaml`, `training/results/baseline_test.json`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `training/tests/test_baseline.py`:
 ```python
@@ -532,11 +532,11 @@ def test_new_class_is_dropped():
     assert b.remap_to_coco_line("5 0.5 0.5 0.1 0.1", OURS, COCO) is None   # stairs_up: COCO can't know it
 ```
 
-- [ ] **Step 2: Run to verify it fails**
+- [x] **Step 2: Run to verify it fails**
 
 Run: `pytest training/tests/test_baseline.py -q` → Expected: `ModuleNotFoundError`.
 
-- [ ] **Step 3: Write the script**
+- [x] **Step 3: Write the script**
 
 Create `training/scripts/make_baseline_labels.py`:
 ```python
@@ -598,7 +598,7 @@ if __name__ == "__main__":
     print("baseline test labels written:", n)
 ```
 
-- [ ] **Step 4: Run tests** → `pytest training/tests -q` → Expected: `6 passed`.
+- [x] **Step 4: Run tests** → `pytest training/tests -q` → Expected: `6 passed`.
 
 - [ ] **Step 5: STUDENT — run the baseline on your Mac**
 
