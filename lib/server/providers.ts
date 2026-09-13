@@ -11,7 +11,7 @@ import { SYSTEM_PROMPT, type Answerer } from "./askLogic";
 
 // If a model id is retired, check https://ai.google.dev/gemini-api/docs/models and https://console.groq.com/docs/models
 export const GEMINI_MODEL = "gemini-3.6-flash";   // 2.5-flash is closed to new accounts (Sep 2026)
-export const GROQ_MODEL = "meta-llama/llama-4-scout-17b-16e-instruct";
+export const GROQ_MODEL = "qwen/qwen3.8-27b";   // llama-4-scout retired on Groq (Sep 2026); qwen3.8 accepts images
 
 function makeAnswerer(model: LanguageModel, providerOptions?: Parameters<typeof generateText>[0]["providerOptions"]): Answerer {
   return async (question, imageBase64) => {

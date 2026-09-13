@@ -2046,7 +2046,7 @@ export async function POST(req: Request) {
 }
 ```
 
-- [~] **Step 7: Keys — local and Vercel** (Gemini key in .env.local; Groq key and Vercel env still to do)
+- [x] **Step 7: Keys — local and Vercel** (both in .env.local, fallback verified; Vercel env at deploy time)
 
 Get free keys: Gemini at https://aistudio.google.com/apikey, Groq at https://console.groq.com/keys. Create `.env.local` (gitignored):
 ```

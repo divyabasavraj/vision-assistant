@@ -60,7 +60,7 @@ One tensor 1×(4+nc)×8400 = 1×19×8400 for my 15 classes: for each of 8400 can
 Test mAP50 went from ≈0.26 (COCO model, 0 on 7 of my classes) to 0.667 after 50 epochs on a T4 (1.7 h). Door 0.95 and stairs-up 0.92 are the best; bicycle, pole, curb and crosswalk sit around 0.45–0.52 and are the targets for the second run.
 
 ## Q: Which model answers questions and why not run it on the phone?
-A cloud vision-language model (Gemini 3.6 Flash, Groq Llama-4 Scout as fallback). Such models are billions of parameters — far too large for a phone browser. They are only needed occasionally, so 3–5 s latency is acceptable there but not for walking.
+A cloud vision-language model (Gemini 3.6 Flash, Qwen 3.8 on Groq as fallback). Such models are billions of parameters — far too large for a phone browser. They are only needed occasionally, so 3–5 s latency is acceptable there but not for walking.
 
 ## Q: How do you keep API keys safe and quota under control?
 Keys live only in `.env.local` on my Mac and in Vercel environment variables, and are used inside the server function. The phone never sees them. The server validates every request with zod, rejects images over 1 MB, and rate-limits each IP to 10 questions per minute.
