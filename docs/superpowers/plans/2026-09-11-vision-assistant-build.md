@@ -600,7 +600,7 @@ if __name__ == "__main__":
 
 - [x] **Step 4: Run tests** → `pytest training/tests -q` → Expected: `6 passed`.
 
-- [ ] **Step 5: STUDENT — run the baseline on your Mac**
+- [x] **Step 5: STUDENT — run the baseline on your Mac**
 
 ```bash
 source training/.venv/bin/activate
@@ -609,7 +609,7 @@ yolo val model=yolo11n.pt data=training/data/baseline/data.yaml split=test imgsz
 ```
 Expected: a table with per-class P, R, mAP50, mAP50-95 for person/car/dog/etc. Copy the summary line and per-class rows into `training/results/baseline_test.md`. Record: overall mAP50 (on overlapping classes only), and note "0.0 on all new classes: stairs_up, stairs_down, curb, pole, door, crosswalk, auto".
 
-- [ ] **Step 6: Journal, viva, commit**
+- [x] **Step 6: Journal, viva, commit**
 
 Append to `docs/viva-prep.md`:
 ```markdown
@@ -639,14 +639,14 @@ git commit -m "feat(training): baseline COCO evaluation on our test split"
 **Interfaces:**
 - Produces: `public/models/best.onnx` (input `images` 1×3×640×640 float32, output `output0` 1×(4+nc)×8400), `public/models/labels.json` = JSON array of class names in id order.
 
-- [ ] **Step 1: STUDENT — zip the merged dataset and upload to Google Drive**
+- [x] **Step 1: STUDENT — zip the merged dataset and upload to Google Drive** (zipped 518 MB at `training/data/merged.zip`; upload still to do)
 
 ```bash
 cd training/data && zip -qr merged.zip merged && cd ../..
 ```
 Upload `merged.zip` to Google Drive folder `MyDrive/vision/`.
 
-- [ ] **Step 2: Create the notebook cells (save as `training/train.ipynb`, run on Colab with GPU runtime: Runtime → Change runtime type → T4 GPU)**
+- [x] **Step 2: Create the notebook cells (save as `training/train.ipynb`, run on Colab with GPU runtime: Runtime → Change runtime type → T4 GPU)**
 
 Cell 1 — setup:
 ```python
