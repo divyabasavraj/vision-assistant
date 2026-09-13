@@ -10,7 +10,7 @@ export type Box = { cls: number; label: string; score: number; cx: number; cy: n
 export type RawBox = { cls: number; score: number; x1: number; y1: number; x2: number; y2: number };
 export type Letterbox = { scale: number; padX: number; padY: number; frameW: number; frameH: number };
 
-export const SCORE_THRESHOLD = 0.35;
+export const SCORE_THRESHOLD = 0.5;   // 0.35 narrated too many low-confidence guesses; see docs/journal
 export const NMS_IOU = 0.45;
 export const ORT_VERSION = "1.29.0"; // keep equal to the version in package.json (npm ls onnxruntime-web)
 

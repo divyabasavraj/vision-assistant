@@ -5,12 +5,15 @@
  * Question you should be able to answer: why keep this logic out of the React component?
  */
 import { CameraFrameSource, type FrameSource } from "./frameSource";
-import { speak, isSpeaking, stopSpeaking, beep } from "./speech";
+import { speak, isSpeaking, stopSpeaking, beep, cue } from "./speech";
 import { startWakeWordListener } from "./listener";
 import type { Command } from "./voiceCommands";
 import { Detector, type Box } from "./detector";
-import { createNarrator } from "./narrator";
+import { createNarrator, type Zone } from "./narrator";
 import { frameToJpeg, askServer } from "./ask";
+
+/** Where each zone sits in the stereo field, for the cue tone that precedes every phrase. */
+const ZONE_PAN: Record<Zone, number> = { left: -0.8, ahead: 0, right: 0.8 };
 
 export type AssistantState = {
   status: "idle" | "starting" | "running" | "error";
@@ -105,6 +108,7 @@ export class Assistant {
     const phrase = this.narrator.update(boxes, nowMs);
     if (!phrase) return;
     if (isSpeaking() && !phrase.interrupt) return;   // don't pile up phrases while one is still being spoken
+    cue(ZONE_PAN[phrase.zone]);
     void this.say(phrase.text, phrase.interrupt);
   }
 

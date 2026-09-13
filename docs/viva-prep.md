@@ -84,3 +84,16 @@ What makes it deep-learning work rather than "used a library":
 What is **not** my deep learning: Gemini / Qwen answering "describe this". Those are someone else's billion-parameter models called over an API — I use them, I did not train them. That honesty is the point of the two-tier design: a small model I trained for the always-on safety loop, a large model I call for the rare open-ended question.
 
 **One-sentence version:** I fine-tuned a YOLO11n convolutional detector on a merged 9k-image dataset to learn seven navigation classes COCO doesn't have, raising test mAP50 from 0.26 to 0.67, and deployed it in-browser on a phone; the cloud model is an add-on, not the contribution.
+
+
+## Q: How do you know something is about to hit you, with one camera and no depth sensor?
+Time-to-contact. If an object's box height is h and it is growing at rate dh/dt, it reaches the camera in roughly h / (dh/dt) seconds. No absolute distance is needed — only how fast the thing is filling the frame — so it works with a single uncalibrated lens. Below 1.5 s straight ahead, the phrase becomes priority 1 and interrupts. The rate is computed on a smoothed height (EMA, alpha 0.4), because raw per-frame height is noisy enough to produce nonsense rates. Note this warns *earlier* than the old rule, which only fired once something was already ahead and close.
+
+## Q: Box height is a terrible distance cue. What did you do about it?
+Scaled it by how tall each class really is. A curb fills almost none of the frame even at your feet; a bus fills it from 30 m away. A `CLASS_SIZE` table (person 1.0, bus 1.8, pole 1.5, curb 0.1, …) multiplies the far/near thresholds per class, so "close" means roughly the same real distance whatever the object. The honest limitation: curb and crosswalk lie on the ground, so their box *height* is governed by perspective more than by distance — the better cue for those is how low they sit in the frame (cy). That is named as future work, not claimed as done.
+
+## Q: Why is direction a tone rather than a word?
+Both, actually. The Web Speech API's voice cannot be panned — `speechSynthesis` does not route through an AudioContext you control — so the panning is a short 660 Hz cue played through a `StereoPannerNode` just before the phrase. A blip in the correct ear is understood faster than the word "left". The words are kept as well, because a user without earbuds would otherwise lose direction entirely.
+
+## Q: Why didn't you train a classifier to read traffic light colour? (discussed, not built)
+Because the answer is already fixed by the object's physical design: traffic lights are red-on-top, green-on-bottom by law everywhere. Cropping the detected box, splitting it into thirds and finding the brightest one gives the state with no model, no dataset and no extra inference time — which matters when the detector already only reaches 5 fps on the phone. Using structure you know beats learning something you can derive.

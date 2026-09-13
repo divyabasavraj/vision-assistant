@@ -68,13 +68,35 @@ export function createRecognizer(opts: {
 }
 
 let audioCtx: AudioContext | null = null;
-/** Short 880 Hz beep: "I heard you, asking now." Created lazily — AudioContext needs a prior user gesture on iOS. */
+/** Created lazily — AudioContext needs a prior user gesture on iOS, which the start button provides. */
+function ctx(): AudioContext | null {
+  try { audioCtx ??= new AudioContext(); return audioCtx; } catch { return null; }
+}
+
+/** Short 880 Hz beep: "I heard you, asking now." */
 export function beep(durationMs = 120): void {
+  tone(880, 0.2, durationMs, 0);
+}
+
+/**
+ * Directional cue played just before a phrase: pan -1 = hard left, 0 = centre, +1 = hard right.
+ * A blip in the correct ear lands faster than the word "left", so this carries the direction and
+ * the speech carries the meaning. The words are kept as well, for anyone not wearing earbuds.
+ */
+export function cue(pan: number, durationMs = 80): void {
+  tone(660, 0.15, durationMs, pan);
+}
+
+function tone(freq: number, volume: number, durationMs: number, pan: number): void {
+  const ac = ctx();
+  if (!ac) return;
   try {
-    audioCtx ??= new AudioContext();
-    const o = audioCtx.createOscillator(); const g = audioCtx.createGain();
-    o.frequency.value = 880; g.gain.value = 0.2;
-    o.connect(g).connect(audioCtx.destination);
-    o.start(); o.stop(audioCtx.currentTime + durationMs / 1000);
-  } catch { /* no audio available — the spoken answer still comes */ }
+    const o = ac.createOscillator(); const g = ac.createGain();
+    o.frequency.value = freq; g.gain.value = volume;
+    // Safari has had createStereoPanner for years, but fall back to centre rather than lose the cue entirely.
+    const panner = typeof ac.createStereoPanner === "function" ? ac.createStereoPanner() : null;
+    if (panner) { panner.pan.value = Math.max(-1, Math.min(1, pan)); o.connect(g).connect(panner).connect(ac.destination); }
+    else o.connect(g).connect(ac.destination);
+    o.start(); o.stop(ac.currentTime + durationMs / 1000);
+  } catch { /* no audio available — the spoken phrase still comes */ }
 }
