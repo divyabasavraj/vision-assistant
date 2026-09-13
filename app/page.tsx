@@ -6,7 +6,7 @@
  */
 import { useEffect, useState } from "react";
 import { Assistant, type AssistantState } from "@/lib/assistant";
-import { speechDiagnostics } from "@/lib/speech";
+import { speechDiagnostics, unlockSpeech } from "@/lib/speech";
 import { CameraView } from "@/components/CameraView";
 import { Caption } from "@/components/Caption";
 import { TalkButton } from "@/components/TalkButton";
@@ -21,7 +21,8 @@ export default function Page() {
   if (!state || state.status === "idle" || state.status === "starting") {
     return (
       <main className="flex h-dvh items-center justify-center bg-black p-6">
-        <button type="button" onClick={() => void assistant.start()} disabled={state?.status === "starting"}
+        {/* unlockSpeech must run in the tap itself — start() awaits the camera, which ends the gesture. */}
+        <button type="button" onClick={() => { unlockSpeech(); void assistant.start(); }} disabled={state?.status === "starting"}
           className="h-48 w-full rounded-2xl bg-blue-700 text-4xl font-bold text-white disabled:opacity-50" aria-label="Start the assistant">
           {state?.status === "starting" ? "Starting…" : "Start"}
         </button>

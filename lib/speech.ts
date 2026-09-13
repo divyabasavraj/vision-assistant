@@ -24,6 +24,21 @@ export function speechDiagnostics(): string {
   return `tts ${started}/${asked} v${voices}${paused ? " PAUSED" : ""}${lastError ? " " + lastError : ""}`;
 }
 
+/**
+ * iOS Safari only runs speechSynthesis if its FIRST utterance was requested inside a user gesture.
+ * Ours came after awaiting camera permission and the ONNX download, so every utterance was accepted
+ * and silently never started — diagnostics showed "tts 0/2 v68": 68 voices, nothing spoken, no error.
+ * Speaking one silent utterance directly in the Start tap unlocks the engine for the whole session.
+ * Must be called synchronously from the event handler; one await beforehand and it stops working.
+ */
+export function unlockSpeech(): void {
+  try {
+    const u = new SpeechSynthesisUtterance(" ");
+    u.volume = 0;
+    window.speechSynthesis.speak(u);
+  } catch { /* no speech support here — captions still show every phrase */ }
+}
+
 export function stopSpeaking(): void {
   window.speechSynthesis.cancel();
   speaking = false;
