@@ -70,3 +70,17 @@ It fixes the model's behaviour: one or two short sentences, concrete, read text 
 
 ## Q: Why did the first phone question fail?
 Gemini 3 models "think" before answering by default; on a photo that took 12–20 s, longer than my timeouts. Describing a picture does not need reasoning, so I set `thinkingLevel: "minimal"` — answers now take 3.5–4.5 s consistently.
+
+## Q: What is *really* the deep learning in this project?
+The detector: YOLO11n, a convolutional neural network (~100 layers, 2.6 M weights) that maps a 640×640 image to boxes and class scores. Everything else — camera, speech, tracking, the API route — is engineering around that network.
+
+What makes it deep-learning work rather than "used a library":
+1. **I changed the weights with data.** The COCO model scored exactly 0 on stairs, curb, pole, door, crosswalk and auto. After 50 epochs of gradient descent on my 7,228 merged training images it scores 0.92 on stairs-up and 0.95 on door. The improvement lives in the weights, not in my code.
+2. **Transfer learning.** I did not train from scratch (7k images would overfit). I started from weights trained on millions of COCO boxes, swapped the 80-class head for a 15-class head, and kept training with a small learning rate. Early layers (edges, textures) barely move; the late layers and the head adapt.
+3. **Dataset engineering.** Class mapping across three datasets, removing augmented duplicates so nothing leaks into the test split, a held-out test set never seen in training, and a baseline to compare against. 0.26 → 0.667 only means something because of those choices.
+4. **The field's metric.** mAP50 over IoU-matched boxes, per class, on unseen data, plus a confusion matrix and failure cases (camels → "dog").
+5. **Deployment constraints shaped the model.** Nano size, exported to ONNX, 5 fps on a phone CPU. The ablations (320-px input, quantisation, a longer v2) are the accuracy-vs-speed trade-offs a DL engineer studies.
+
+What is **not** my deep learning: Gemini / Qwen answering "describe this". Those are someone else's billion-parameter models called over an API — I use them, I did not train them. That honesty is the point of the two-tier design: a small model I trained for the always-on safety loop, a large model I call for the rare open-ended question.
+
+**One-sentence version:** I fine-tuned a YOLO11n convolutional detector on a merged 9k-image dataset to learn seven navigation classes COCO doesn't have, raising test mAP50 from 0.26 to 0.67, and deployed it in-browser on a phone; the cloud model is an add-on, not the contribution.
