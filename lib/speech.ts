@@ -66,3 +66,15 @@ export function createRecognizer(opts: {
   r.onerror = (e) => opts.onError(e.error);
   return { start: () => { try { r.start(); } catch { /* already started */ } }, stop: () => r.stop() };
 }
+
+let audioCtx: AudioContext | null = null;
+/** Short 880 Hz beep: "I heard you, asking now." Created lazily — AudioContext needs a prior user gesture on iOS. */
+export function beep(durationMs = 120): void {
+  try {
+    audioCtx ??= new AudioContext();
+    const o = audioCtx.createOscillator(); const g = audioCtx.createGain();
+    o.frequency.value = 880; g.gain.value = 0.2;
+    o.connect(g).connect(audioCtx.destination);
+    o.start(); o.stop(audioCtx.currentTime + durationMs / 1000);
+  } catch { /* no audio available — the spoken answer still comes */ }
+}

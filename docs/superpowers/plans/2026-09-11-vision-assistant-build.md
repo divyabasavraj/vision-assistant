@@ -1882,7 +1882,7 @@ git add -A && git commit -m "feat(app): narration engine with tracking, events, 
   - client: `frameToJpeg(frame: Frame, maxSide?: number, quality?: number): string`, `askServer(question, imageBase64): Promise<{ answer: string; ms: number } | { error: "retry" | "offline" | "server"; ms: number }>`
   - `beep(): void`
 
-- [ ] **Step 1: Failing tests**
+- [x] **Step 1: Failing tests**
 
 Create `tests/askLogic.test.ts`:
 ```ts
@@ -1925,9 +1925,9 @@ describe("createRateLimiter", () => {
 });
 ```
 
-- [ ] **Step 2: Run** — `npm test` → FAIL "Cannot find module '../lib/server/askLogic'".
+- [x] **Step 2: Run** — `npm test` → FAIL "Cannot find module '../lib/server/askLogic'".
 
-- [ ] **Step 3: `lib/server/askLogic.ts`**
+- [x] **Step 3: `lib/server/askLogic.ts`**
 
 ```ts
 /**
@@ -1980,9 +1980,9 @@ export function createRateLimiter(limit: number, windowMs: number): (key: string
 }
 ```
 
-- [ ] **Step 4: Run tests** — `npm test` → all pass.
+- [x] **Step 4: Run tests** — `npm test` → all pass.
 
-- [ ] **Step 5: `lib/server/providers.ts`**
+- [x] **Step 5: `lib/server/providers.ts`**
 
 ```ts
 /**
@@ -2017,7 +2017,7 @@ export const geminiAnswerer: Answerer = makeAnswerer(google(GEMINI_MODEL));
 export const groqAnswerer: Answerer = makeAnswerer(groq(GROQ_MODEL));
 ```
 
-- [ ] **Step 6: `app/api/ask/route.ts`**
+- [x] **Step 6: `app/api/ask/route.ts`**
 
 ```ts
 /**
@@ -2046,7 +2046,7 @@ export async function POST(req: Request) {
 }
 ```
 
-- [ ] **Step 7: Keys — local and Vercel**
+- [~] **Step 7: Keys — local and Vercel** (Gemini key in .env.local; Groq key and Vercel env still to do)
 
 Get free keys: Gemini at https://aistudio.google.com/apikey, Groq at https://console.groq.com/keys. Create `.env.local` (gitignored):
 ```
@@ -2061,7 +2061,7 @@ curl -s -X POST localhost:3000/api/ask -H 'content-type: application/json' -d "{
 ```
 Expected: `{"answer":"..."}` in 2–4 s. Temporarily put a wrong Gemini key to see the Groq fallback work (log line `provider failed:`), then restore.
 
-- [ ] **Step 8: Client side — `lib/ask.ts` and `beep()`**
+- [x] **Step 8: Client side — `lib/ask.ts` and `beep()`**
 
 `lib/ask.ts`:
 ```ts
@@ -2114,7 +2114,7 @@ export function beep(durationMs = 120): void {
 }
 ```
 
-- [ ] **Step 9: Real `ask()` in `lib/assistant.ts`**
+- [x] **Step 9: Real `ask()` in `lib/assistant.ts`**
 
 Replace the echo version:
 ```ts

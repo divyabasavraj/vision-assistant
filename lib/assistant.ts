@@ -1,15 +1,16 @@
 /**
  * Purpose : The conductor. Owns the camera, the mouth (TTS) and the ears (trigger-word listener),
  *           and later the detector, narrator and Q&A. React only renders what this class reports via onState.
- * Depends : lib/frameSource.ts, lib/speech.ts, lib/listener.ts, lib/voiceCommands.ts, lib/detector.ts, lib/narrator.ts.
+ * Depends : lib/frameSource.ts, lib/speech.ts, lib/listener.ts, lib/voiceCommands.ts, lib/detector.ts, lib/narrator.ts, lib/ask.ts.
  * Question you should be able to answer: why keep this logic out of the React component?
  */
 import { CameraFrameSource, type FrameSource } from "./frameSource";
-import { speak, isSpeaking, stopSpeaking } from "./speech";
+import { speak, isSpeaking, stopSpeaking, beep } from "./speech";
 import { startWakeWordListener } from "./listener";
 import type { Command } from "./voiceCommands";
 import { Detector, type Box } from "./detector";
 import { createNarrator } from "./narrator";
+import { frameToJpeg, askServer } from "./ask";
 
 export type AssistantState = {
   status: "idle" | "starting" | "running" | "error";
@@ -22,17 +23,18 @@ export type AssistantState = {
   fps: number;            // detector frames per second (average of the last 20)
   boxes: Box[];           // latest detections, coordinates as fractions of the camera frame
   sttRestarts: number;
+  lastAskMs: number;      // round-trip of the last cloud question (0 = none yet)
 };
 
 export class Assistant {
-  state: AssistantState = { status: "idle", caption: "", heard: "", listening: false, narrationPaused: false, fps: 0, boxes: [], sttRestarts: 0 };
+  state: AssistantState = { status: "idle", caption: "", heard: "", listening: false, narrationPaused: false, fps: 0, boxes: [], sttRestarts: 0, lastAskMs: 0 };
   readonly frames: FrameSource;
   private stopListening: (() => void) | null = null;
   private detector: Detector | null = null;
   private loopTimer: number | null = null;
   private frameTimes: number[] = [];
   private narrator = createNarrator();
-  private answering = false;   // true while a question is being answered (Task 8) — narration yields
+  private answering = false;   // true while a question is being answered — narration yields
 
   constructor(private onState: (s: AssistantState) => void, frames?: FrameSource) {
     this.frames = frames ?? new CameraFrameSource();
@@ -125,8 +127,26 @@ export class Assistant {
     }
   }
 
-  // Replaced by the real /api/ask call in Task 8. For now: echo, so we can test the voice path end to end.
+  // One photo + the question go to /api/ask (cloud vision model). Narration pauses meanwhile and the
+  // tracker is reset afterwards because the scene may have changed while we were away.
   async ask(question: string): Promise<void> {
-    await this.say("you asked: " + question, true);
+    if (this.answering) return;
+    this.answering = true;
+    try {
+      beep();
+      stopSpeaking();
+      const frame = this.frames.getFrame();
+      if (!frame) { await this.say("camera not ready", true); return; }
+      this.set({ caption: "asking…", heard: question });
+      const result = await askServer(question, frameToJpeg(frame));
+      this.set({ lastAskMs: result.ms });
+      if ("answer" in result) await this.say(result.answer, true);
+      else if (result.error === "offline") await this.say("no connection — questions need internet", true);
+      else if (result.error === "retry") await this.say("please try again in a moment", true);
+      else await this.say("something went wrong, try again", true);
+    } finally {
+      this.answering = false;
+      this.narrator.reset();
+    }
   }
 }
