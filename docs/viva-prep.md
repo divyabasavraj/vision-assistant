@@ -22,3 +22,15 @@ The original COCO yolo11n with no fine-tuning, scored on my untouched test split
 
 ## Q: Why did you drop images from the augmented dataset?
 Roboflow "augmented" exports contain 2–3 rotated/flipped copies of every training image. If I merged those and re-split, a copy of a training image could land in my test set and inflate the score (data leakage). So for augmented datasets I keep one copy per source image before splitting. I did not apply this to un-augmented datasets because they reuse generic file names ("7.jpg") for different photos.
+
+## Q: What is NMS?
+The model proposes many overlapping boxes for one object. Non-maximum suppression sorts by score and drops any box that overlaps an already-kept box of the same class by IoU > 0.45, keeping only the best.
+
+## Q: What is WebGPU vs WASM here?
+Two ways ONNX Runtime Web can run the network in a browser: WebGPU uses the phone's graphics chip (fast, newer phones); WebAssembly runs on the CPU (works everywhere, slower). We try WebGPU first and fall back.
+
+## Q: Why 640 input and why does frame rate matter?
+640 is what we trained at; halving to 320 is ~4× fewer pixels (faster, less accurate) — that is one of my ablations. The narration engine needs several frames per second to confirm an object over 3 frames and react before the user reaches it.
+
+## Q: How do you know your decode/NMS code is right?
+I ran the same ONNX file through ultralytics' own predict() and through my TypeScript decodeOutput+nms on one test image with identical thresholds: same 7 boxes, same classes, scores equal to 2 decimals, corners within half a pixel.

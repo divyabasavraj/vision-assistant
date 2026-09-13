@@ -30,7 +30,7 @@ export default function Page() {
 
   return (
     <main className="relative h-dvh overflow-hidden bg-black">
-      <CameraView frames={assistant.frames} onDoubleTap={() => (state.narrationPaused ? assistant.resumeNarration() : assistant.pauseNarration())} />
+      <CameraView frames={assistant.frames} boxes={state.boxes} onDoubleTap={() => (state.narrationPaused ? assistant.resumeNarration() : assistant.pauseNarration())} />
       <Caption said={state.caption} heard={state.heard} />
       {state.status === "error" && <p role="alert" className="absolute inset-x-0 top-1/3 bg-red-800 p-4 text-xl text-white">{state.error}</p>}
       <div className="absolute inset-x-0 bottom-1/3 flex gap-2 p-2">
@@ -38,7 +38,7 @@ export default function Page() {
         <button type="button" className="flex-1 rounded-xl bg-gray-800/90 py-4 text-xl text-white" onClick={() => void assistant.handleCommand({ kind: "read" })} aria-label="Read text in view">Read</button>
       </div>
       <TalkButton onQuestion={(q) => void assistant.handleCommand({ kind: "ask", question: q })} />
-      <p className="absolute bottom-1 right-2 text-xs text-gray-400">{state.listening ? "🎤 say “vision, …”" : "🎤 off"} · restarts {state.sttRestarts}</p>
+      <p className="absolute bottom-1 right-2 text-xs text-gray-400">{state.listening ? "🎤 say “vision, …”" : "🎤 off"} · restarts {state.sttRestarts} · {state.backend ?? "…"} {state.fps} fps</p>
     </main>
   );
 }

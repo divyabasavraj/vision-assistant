@@ -1327,7 +1327,7 @@ git add docs README.md && git commit -m "docs: day-3 journal, viva entries, publ
   - `class Detector { static load(modelUrl, labelsUrl, inputSize?): Promise<Detector>; detect(frame: Frame): Promise<Box[]>; backend: string; labels: string[] }`
   - `AssistantState.boxes: Box[]`, `AssistantState.backend`, `AssistantState.fps`
 
-- [ ] **Step 1: Failing tests for the pure parts**
+- [x] **Step 1: Failing tests for the pure parts**
 
 Create `tests/detector.test.ts`:
 ```ts
@@ -1375,9 +1375,9 @@ describe("letterbox mapping", () => {
 });
 ```
 
-- [ ] **Step 2: Run to verify it fails** — `npm test` → FAIL "Cannot find module '../lib/detector'".
+- [x] **Step 2: Run to verify it fails** — `npm test` → FAIL "Cannot find module '../lib/detector'".
 
-- [ ] **Step 3: Implement `lib/detector.ts`**
+- [x] **Step 3: Implement `lib/detector.ts`**
 
 ```ts
 /**
@@ -1505,9 +1505,9 @@ export class Detector {
 ```
 Check the version constant: `npm ls onnxruntime-web` and set `ORT_VERSION` to exactly that.
 
-- [ ] **Step 4: Run tests** — `npm test` → Expected: all pass (voiceCommands 6 + detector 5).
+- [x] **Step 4: Run tests** — `npm test` → Expected: all pass (voiceCommands 6 + detector 5).
 
-- [ ] **Step 5: Detection loop in `lib/assistant.ts`**
+- [x] **Step 5: Detection loop in `lib/assistant.ts`**
 
 Change `boxes: unknown[]` to `boxes: Box[]` (import `type Box` and `Detector` from `./detector`). Add fields and methods:
 ```ts
@@ -1548,7 +1548,7 @@ After `this.set({ status: "running", ... })`: `this.scheduleLoop();`. In `stop()
   protected onBoxes(_boxes: Box[], _nowMs: number): void {}
 ```
 
-- [ ] **Step 6: Box overlay in `components/CameraView.tsx`**
+- [x] **Step 6: Box overlay in `components/CameraView.tsx`**
 
 Add prop `boxes: Box[]` and a `<canvas ref={canvasRef} className="pointer-events-none absolute inset-0 h-full w-full" />` after the video. Add:
 ```tsx

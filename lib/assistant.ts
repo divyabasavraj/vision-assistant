@@ -1,13 +1,14 @@
 /**
  * Purpose : The conductor. Owns the camera, the mouth (TTS) and the ears (trigger-word listener),
  *           and later the detector, narrator and Q&A. React only renders what this class reports via onState.
- * Depends : lib/frameSource.ts, lib/speech.ts, lib/listener.ts, lib/voiceCommands.ts.
+ * Depends : lib/frameSource.ts, lib/speech.ts, lib/listener.ts, lib/voiceCommands.ts, lib/detector.ts.
  * Question you should be able to answer: why keep this logic out of the React component?
  */
 import { CameraFrameSource, type FrameSource } from "./frameSource";
 import { speak, isSpeaking, stopSpeaking } from "./speech";
 import { startWakeWordListener } from "./listener";
 import type { Command } from "./voiceCommands";
+import { Detector, type Box } from "./detector";
 
 export type AssistantState = {
   status: "idle" | "starting" | "running" | "error";
@@ -16,9 +17,9 @@ export type AssistantState = {
   listening: boolean;     // trigger-word listener active
   narrationPaused: boolean;
   error?: string;
-  backend?: string;       // "webgpu" | "wasm" (Task 6)
-  fps: number;            // detector frames per second (Task 6)
-  boxes: unknown[];       // detections (typed as Box[] in Task 6)
+  backend?: string;       // "webgpu" | "wasm"
+  fps: number;            // detector frames per second (average of the last 20)
+  boxes: Box[];           // latest detections, coordinates as fractions of the camera frame
   sttRestarts: number;
 };
 
@@ -26,6 +27,9 @@ export class Assistant {
   state: AssistantState = { status: "idle", caption: "", heard: "", listening: false, narrationPaused: false, fps: 0, boxes: [], sttRestarts: 0 };
   readonly frames: FrameSource;
   private stopListening: (() => void) | null = null;
+  private detector: Detector | null = null;
+  private loopTimer: number | null = null;
+  private frameTimes: number[] = [];
 
   constructor(private onState: (s: AssistantState) => void, frames?: FrameSource) {
     this.frames = frames ?? new CameraFrameSource();
@@ -44,6 +48,13 @@ export class Assistant {
       this.set({ status: "error", error: "Camera permission denied or no camera: " + String(e) });
       return;
     }
+    try {
+      this.detector = await Detector.load("/models/best.onnx", "/models/labels.json");
+      this.set({ backend: this.detector.backend });
+    } catch (e) {
+      this.set({ status: "error", error: "Model failed to load: " + String(e) });
+      return;
+    }
     this.stopListening = startWakeWordListener({
       onCommand: (c) => void this.handleCommand(c),
       onTranscript: (t) => this.set({ heard: t }),
@@ -52,15 +63,39 @@ export class Assistant {
       onUnsupported: () => this.set({ listening: false, caption: "Voice not supported here — use the button" }),
     });
     this.set({ status: "running", listening: this.stopListening !== null });
+    this.scheduleLoop();
     await this.say("camera ready");
   }
 
   stop(): void {
+    if (this.loopTimer !== null) clearTimeout(this.loopTimer);
+    this.loopTimer = null;
     this.stopListening?.();
     this.frames.stop();
     stopSpeaking();
     this.set({ status: "idle", listening: false });
   }
+
+  // Detection loop: one frame at a time, back-to-back (no fixed interval — the model sets the pace).
+  private scheduleLoop() { this.loopTimer = window.setTimeout(() => void this.tick(), 0); }
+
+  private async tick(): Promise<void> {
+    if (this.state.status !== "running" || !this.detector) return;
+    const frame = this.frames.getFrame();
+    if (frame) {
+      const t0 = performance.now();
+      const boxes = await this.detector.detect(frame);
+      this.frameTimes.push(performance.now() - t0);
+      if (this.frameTimes.length > 20) this.frameTimes.shift();
+      const avg = this.frameTimes.reduce((a, b) => a + b, 0) / this.frameTimes.length;
+      this.set({ boxes, fps: Math.round(1000 / Math.max(avg, 1)) });
+      this.onBoxes(boxes, performance.now());
+    }
+    if (this.state.status === "running") this.scheduleLoop();
+  }
+
+  // Hook for the narration engine (filled in Task 7).
+  protected onBoxes(boxes: Box[], nowMs: number): void { void boxes; void nowMs; }
 
   async say(text: string, interrupt = false): Promise<void> {
     this.set({ caption: text });
