@@ -1266,7 +1266,7 @@ export default function Page() {
 ```
 In `app/layout.tsx` set metadata `title: "Vision Assistant"`, add `export const viewport = { width: "device-width", initialScale: 1, maximumScale: 1, themeColor: "#000000" }`, and give `<body>` the class `bg-black text-white`.
 
-- [ ] **Step 11: Run locally, then on the phone over the LAN**
+- [x] **Step 11: Run locally, then on the phone over the LAN**
 
 ```bash
 npm run dev -- --hostname 0.0.0.0 --experimental-https
@@ -1573,7 +1573,7 @@ Add prop `boxes: Box[]` and a `<canvas ref={canvasRef} className="pointer-events
 ```
 Import `type Box` from `@/lib/detector`. In `app/page.tsx` pass `boxes={state.boxes}` and extend the bottom-right badge with `· {state.backend} {state.fps} fps`.
 
-- [ ] **Step 7: Build check and STUDENT phone test**
+- [x] **Step 7: Build check and STUDENT phone test** (iPhone 13 Safari: wasm 5 fps)
 
 ```bash
 npm run build
@@ -1589,7 +1589,7 @@ Deploy: `vercel --prod --yes`. On the phone: Start → wait for boxes. Record in
 
 **Decision point (end of Day 4):** if the model does not load or fps < 3 on wasm, try `inputSize=320` (re-export ONNX with `imgsz=320` on Colab — Task 9 does this anyway for the ablation). If still unusable, fall back to server-side inference as spec §10 says: a Python function on Vercel — record the decision in the journal and ask for the fallback plan before continuing.
 
-- [ ] **Step 8: Journal, viva, commit**
+- [x] **Step 8: Journal, viva, commit**
 
 Append to `docs/viva-prep.md`:
 ```markdown

@@ -55,3 +55,6 @@ __pycache__/
 # graphify knowledge graph (generated)
 graphify-out/
 training/.env
+
+# local dev TLS certs (mkcert)
+certificates/
