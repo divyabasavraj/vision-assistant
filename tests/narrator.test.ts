@@ -64,7 +64,8 @@ describe("narrator events", () => {
     expect(n.update(both, 1800)?.text).toBe("table, right, near");        // 1.5 s later it speaks
     const pole = [...both, box("pole", 0.5, 0.85, 3)];
     for (let t = 1900; t < 2100; t += 100) n.update(pole, t);
-    expect(n.update(pole, 2100)).toEqual({ text: "pole, ahead, close", priority: 1, interrupt: true, zone: "ahead" });
+    // chair blocks the left and table blocks the right, so there is genuinely nowhere to step.
+    expect(n.update(pole, 2100)).toEqual({ text: "pole, ahead, close, stop", priority: 1, interrupt: true, zone: "ahead" });
   });
 
   it("does not repeat the same object within 5 s unless closer", () => {
@@ -123,7 +124,7 @@ describe("fast approach", () => {
       const p = n.update([box("car", 0.5, h)], i * 100);
       if (p) said.push(p.text);
     });
-    expect(said).toContain("car approaching fast, ahead");
+    expect(said).toContain("car approaching fast, ahead, go left");
   });
 
   it("interrupts, because a fast approach is priority 1", () => {
@@ -133,7 +134,7 @@ describe("fast approach", () => {
       const p = n.update([box("car", 0.5, h)], i * 100);
       if (p?.text.includes("approaching fast")) urgent = p;
     });
-    expect(urgent).toEqual({ text: "car approaching fast, ahead", priority: 1, interrupt: true, zone: "ahead" });
+    expect(urgent).toEqual({ text: "car approaching fast, ahead, go left", priority: 1, interrupt: true, zone: "ahead" });
   });
 
   it("stays quiet when the object grows slowly", () => {
@@ -154,5 +155,62 @@ describe("fast approach", () => {
       if (p) said.push(p.text);
     });
     expect(said.some((s) => s.includes("approaching fast"))).toBe(false);
+  });
+});
+
+describe("escape direction", () => {
+  const confirm = (n: ReturnType<typeof createNarrator>, boxes: Box[]) => {
+    let out: Phrase | null = null;
+    for (let t = 0; t < 300; t += 100) out = n.update(boxes, t);
+    return out;
+  };
+
+  it("tells you which way to go when something close blocks the path", () => {
+    const n = createNarrator();
+    expect(confirm(n, [box("pole", 0.5, 0.85)])?.text).toBe("pole, ahead, close, go left");
+  });
+
+  it("sends you to the clear side when one side is occupied", () => {
+    const n = createNarrator();
+    expect(confirm(n, [box("pole", 0.5, 0.85, 0), box("person", 0.15, 0.3, 1)])?.text)
+      .toBe("pole, ahead, close, go right");
+  });
+
+  it("says stop when both sides are blocked too", () => {
+    const n = createNarrator();
+    expect(confirm(n, [box("pole", 0.5, 0.85, 0), box("person", 0.15, 0.3, 1), box("person", 0.85, 0.3, 1)])?.text)
+      .toBe("pole, ahead, close, stop");
+  });
+
+  it("never tells you to step around a level change, because you cannot", () => {
+    const n = createNarrator();
+    expect(confirm(n, [box("stairs_down", 0.5, 0.4)])?.text).toBe("stairs down, ahead, close");
+  });
+
+  it("does not add a direction to routine, non-blocking phrases", () => {
+    const n = createNarrator();
+    expect(confirm(n, [box("person", 0.2, 0.3)])?.text).toBe("person, left, near");
+  });
+
+  it("does not treat a crosswalk as something blocking a side", () => {
+    const n = createNarrator();
+    expect(confirm(n, [box("pole", 0.5, 0.85, 0), box("crosswalk", 0.15, 0.1, 1)])?.text)
+      .toBe("pole, ahead, close, go left");
+  });
+
+  it("does not let a far object block a side", () => {
+    const n = createNarrator();
+    expect(confirm(n, [box("pole", 0.5, 0.85, 0), box("person", 0.15, 0.1, 1), box("person", 0.85, 0.3, 2)])?.text)
+      .toBe("pole, ahead, close, go left");
+  });
+
+  it("gives a way out of a fast approach as well", () => {
+    const n = createNarrator();
+    let urgent: Phrase | null = null;
+    [0.10, 0.13, 0.17, 0.22].forEach((h, i) => {
+      const p = n.update([box("car", 0.5, h)], i * 100);
+      if (p?.text.includes("approaching fast")) urgent = p;
+    });
+    expect(urgent).toEqual({ text: "car approaching fast, ahead, go left", priority: 1, interrupt: true, zone: "ahead" });
   });
 });

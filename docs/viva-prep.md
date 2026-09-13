@@ -97,3 +97,9 @@ Both, actually. The Web Speech API's voice cannot be panned — `speechSynthesis
 
 ## Q: Why didn't you train a classifier to read traffic light colour? (discussed, not built)
 Because the answer is already fixed by the object's physical design: traffic lights are red-on-top, green-on-bottom by law everywhere. Cropping the detected box, splitting it into thirds and finding the brightest one gives the state with no model, no dataset and no extra inference time — which matters when the detector already only reaches 5 fps on the phone. Using structure you know beats learning something you can derive.
+
+
+## Q: How does the app know where it is safe to go?
+It does not model free space directly — it uses the absence of tracks. The frame is already split into left / ahead / right thirds, so when a priority-1 obstacle blocks the middle, each side is checked for any confirmed track at near or close range. A side with none is usable. Far objects are ignored, because something far away does not stop you stepping across; crosswalk and door are ignored too, because they are destinations rather than obstacles. Both sides blocked gives "stop"; both clear picks the emptier side, tie-breaking left so the instruction cannot oscillate between frames.
+
+The deliberate exception is level changes. Stairs and curbs get no direction at all, because steering is not the correct response to a step — the step is still there whichever way you turn, and advising a sideways move next to stairs is more dangerous than saying nothing. That is a case where the safest design is to give less advice, not more.

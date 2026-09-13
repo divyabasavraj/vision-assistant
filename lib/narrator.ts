@@ -27,6 +27,8 @@ export type Phrase = { text: string; priority: 1 | 2 | 3 | 4; interrupt: boolean
 
 const MOVING = new Set(["person", "dog", "car", "bicycle", "motorbike", "auto", "bus"]);
 const LEVEL_CHANGE = new Set(["stairs_up", "stairs_down", "curb"]);
+/** Things you walk towards, not around. They never count as occupying a side. */
+const GUIDES = new Set(["crosswalk", "door"]);
 const BUCKET_RANK: Record<Bucket, number> = { far: 0, near: 1, close: 2 };
 
 /**
@@ -117,6 +119,25 @@ export function createNarrator(cfg: NarratorConfig = NARRATOR_CONFIG) {
     return rate > 0 ? t.smoothH / rate : Infinity;
   }
 
+  const onScreen = () => tracks.filter((t) => t.confirmed && t.missed === 0 && !GUIDES.has(t.label));
+  /** A side is unusable if anything near or close sits in it; something far away won't stop you stepping across. */
+  const sideBlocked = (zone: Zone) => onScreen().some((t) => zoneOf(t.box.cx) === zone && bucketOf(t.smoothH, cfg, t.label) !== "far");
+  const sideCount = (zone: Zone) => onScreen().filter((t) => zoneOf(t.box.cx) === zone).length;
+
+  /**
+   * Where to go when the way ahead is blocked. Returns null for level changes: you cannot side-step a
+   * step — it is still there — and steering someone sideways beside stairs is worse than not advising.
+   * With both sides open, the emptier one wins; an exact tie always resolves left so it cannot dither.
+   */
+  function escape(blockerLabel: string): string | null {
+    if (LEVEL_CHANGE.has(blockerLabel)) return null;
+    const left = sideBlocked("left"), right = sideBlocked("right");
+    if (left && right) return "stop";
+    if (left) return "go right";
+    if (right) return "go left";
+    return sideCount("right") < sideCount("left") ? "go right" : "go left";
+  }
+
   function priorityOf(t: Track, zone: Zone, bucket: Bucket, closer: boolean): 1 | 2 | 3 | 4 {
     if (zone === "ahead" && bucket === "close") return 1;
     if (MOVING.has(t.label) && closer) return 2;
@@ -159,6 +180,11 @@ export function createNarrator(cfg: NarratorConfig = NARRATOR_CONFIG) {
       const gapOk = nowMs - lastPhraseAt >= cfg.minGapMs;
       const pick = cands[0];
       if (pick && (gapOk || pick.phrase.priority === 1)) {
+        // Only a priority-1 phrase means "genuinely blocked", and only then is a direction useful.
+        if (pick.phrase.priority === 1) {
+          const way = escape(pick.track.label);
+          if (way) pick.phrase.text = `${pick.phrase.text}, ${way}`;
+        }
         pick.track.spokenAt = nowMs; pick.track.spokenBucket = pick.bucket; pick.track.spokenZone = pick.zone;
         if (pick.approach) pick.track.spokenApproachAt = nowMs;
         lastPhraseAt = nowMs;
