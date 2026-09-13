@@ -21,3 +21,21 @@ def test_overlapping_class_is_translated():
 
 def test_new_class_is_dropped():
     assert b.remap_to_coco_line("5 0.5 0.5 0.1 0.1", OURS, COCO) is None   # stairs_up: COCO can't know it
+
+
+def test_build_links_images_per_file_so_ultralytics_finds_baseline_labels(tmp_path: Path):
+    # Ultralytics resolve()s the split directory, so a symlinked *directory* would lead it to
+    # merged/labels (our 15-class ids) instead of baseline/labels (COCO ids). Link per file.
+    merged = tmp_path / "merged"
+    (merged / "images" / "test").mkdir(parents=True)
+    (merged / "labels" / "test").mkdir(parents=True)
+    (merged / "images" / "test" / "a.jpg").write_bytes(b"IMG")
+    (merged / "labels" / "test" / "a.txt").write_text("2 0.5 0.5 0.2 0.2\n7 0.5 0.5 0.2 0.2\n")  # car, stairs_up
+    out = tmp_path / "baseline"
+
+    n = b.build(merged, out, ["person", "bicycle", "car"])
+
+    assert n == 1
+    assert not (out / "images" / "test").is_symlink()
+    assert (out / "images" / "test" / "a.jpg").is_symlink()
+    assert (out / "labels" / "test" / "a.txt").read_text() == "2 0.5 0.5 0.2 0.2\n"

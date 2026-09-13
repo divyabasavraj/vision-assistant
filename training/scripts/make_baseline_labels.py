@@ -36,8 +36,12 @@ def build(merged: Path, out: Path, coco_names: list[str]) -> int:
     if out.exists():
         shutil.rmtree(out)
     (out / "labels" / "test").mkdir(parents=True)
-    (out / "images").mkdir(parents=True)
-    os.symlink((merged / "images" / "test").resolve(), out / "images" / "test")
+    # One symlink per image, NOT a symlinked directory: ultralytics resolve()s the split dir and
+    # then swaps images->labels in the path, which would send it to merged/labels (wrong ids).
+    (out / "images" / "test").mkdir(parents=True)
+    for img in (merged / "images" / "test").iterdir():
+        if img.suffix.lower() in {".jpg", ".jpeg", ".png"}:
+            os.symlink(img.resolve(), out / "images" / "test" / img.name)
     kept = 0
     for lbl in (merged / "labels" / "test").glob("*.txt"):
         lines = [r for r in (remap_to_coco_line(l, TARGET_CLASSES, coco_names) for l in lbl.read_text().splitlines()) if r]
