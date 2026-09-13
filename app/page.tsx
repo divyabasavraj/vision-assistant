@@ -31,6 +31,12 @@ export default function Page() {
   return (
     <main className="relative h-dvh overflow-hidden bg-black">
       <CameraView frames={assistant.frames} boxes={state.boxes} onDoubleTap={() => (state.narrationPaused ? assistant.resumeNarration() : assistant.pauseNarration())} />
+      <button type="button" onClick={() => assistant.setMicMode(state.micMode === "always" ? "hold" : "always")}
+        aria-pressed={state.micMode === "hold"}
+        aria-label={state.micMode === "always" ? "Microphone always on. Tap to switch to hold to talk." : "Hold to talk. Tap to switch to always listening."}
+        className="absolute right-2 top-2 z-10 rounded-xl bg-gray-900/85 px-4 py-3 text-base font-semibold text-white">
+        {state.micMode === "always" ? "Mic: always on" : "Mic: hold to talk"}
+      </button>
       <Caption said={state.caption} heard={state.heard} />
       {state.status === "error" && <p role="alert" className="absolute inset-x-0 top-1/3 bg-red-800 p-4 text-xl text-white">{state.error}</p>}
       <div className="absolute inset-x-0 bottom-1/3 flex gap-2 p-2">

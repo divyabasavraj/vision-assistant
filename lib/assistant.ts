@@ -15,8 +15,16 @@ import { frameToJpeg, askServer } from "./ask";
 /** Where each zone sits in the stereo field, for the cue tone that precedes every phrase. */
 const ZONE_PAN: Record<Zone, number> = { left: -0.8, ahead: 0, right: 0.8 };
 
+/**
+ * "always" keeps speech-to-text running the whole session, so "vision, ..." works hands-free — but
+ * Safari transcribes in the cloud, so every conversation nearby leaves the device. "hold" never starts
+ * that listener: the mic only opens while the talk button is held. Convenience vs bystander privacy.
+ */
+export type MicMode = "always" | "hold";
+
 export type AssistantState = {
   status: "idle" | "starting" | "running" | "error";
+  micMode: MicMode;
   caption: string;        // last thing the app said
   heard: string;          // live transcript
   listening: boolean;     // trigger-word listener active
@@ -30,7 +38,7 @@ export type AssistantState = {
 };
 
 export class Assistant {
-  state: AssistantState = { status: "idle", caption: "", heard: "", listening: false, narrationPaused: false, fps: 0, boxes: [], sttRestarts: 0, lastAskMs: 0 };
+  state: AssistantState = { status: "idle", micMode: "always", caption: "", heard: "", listening: false, narrationPaused: false, fps: 0, boxes: [], sttRestarts: 0, lastAskMs: 0 };
   readonly frames: FrameSource;
   private stopListening: (() => void) | null = null;
   private detector: Detector | null = null;
@@ -63,6 +71,13 @@ export class Assistant {
       this.set({ status: "error", error: "Model failed to load: " + String(e) });
       return;
     }
+    if (this.state.micMode === "always") this.startListening();
+    this.set({ status: "running" });
+    this.scheduleLoop();
+    await this.say("camera ready");
+  }
+
+  private startListening(): void {
     this.stopListening = startWakeWordListener({
       onCommand: (c) => void this.handleCommand(c),
       onTranscript: (t) => this.set({ heard: t }),
@@ -70,9 +85,22 @@ export class Assistant {
       onRestart: (n) => this.set({ sttRestarts: n }),
       onUnsupported: () => this.set({ listening: false, caption: "Voice not supported here — use the button" }),
     });
-    this.set({ status: "running", listening: this.stopListening !== null });
-    this.scheduleLoop();
-    await this.say("camera ready");
+    this.set({ listening: this.stopListening !== null });
+  }
+
+  /** Switching to "hold" tears the listener down rather than ignoring it: the mic must actually close. */
+  setMicMode(mode: MicMode): void {
+    if (mode === this.state.micMode) return;
+    this.set({ micMode: mode, heard: "" });
+    if (mode === "hold") {
+      this.stopListening?.();
+      this.stopListening = null;
+      this.set({ listening: false });
+      void this.say("hold to talk", true);
+    } else if (this.state.status === "running") {
+      this.startListening();
+      void this.say("always listening", true);
+    }
   }
 
   stop(): void {
