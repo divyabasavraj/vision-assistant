@@ -1,0 +1,13 @@
+{
+  "Persons": "person",
+  "Dog": "dog",
+  "Car": "car",
+  "Bus": "bus",
+  "Upstair": "stairs_up",
+  "Downstair": "stairs_down",
+  "Curb": "curb",
+  "Chair": "chair",
+  "Table": "table",
+  "Door": "door",
+  "Crosswalk": "crosswalk"
+}

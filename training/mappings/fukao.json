@@ -1,0 +1,14 @@
+{
+  "person": "person",
+  "car": "car",
+  "bicycle": "bicycle",
+  "motorbike": "motorbike",
+  "auto-rikshaw": "auto",
+  "bus": "bus",
+  "upstair": "stairs_up",
+  "downstair": "stairs_down",
+  "occupied-chair": "chair",
+  "unoccupied-chair": "chair",
+  "Table": "table",
+  "Door": "door"
+}

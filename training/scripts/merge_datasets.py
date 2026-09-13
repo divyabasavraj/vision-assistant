@@ -3,13 +3,17 @@ Purpose : Turn 2-3 downloaded Roboflow datasets (YOLO format) into ONE clean dat
           - translate each dataset's class names into our TARGET_CLASSES using mappings/<dataset>.json
           - drop labels for classes we do not want
           - drop exact duplicate images (same bytes)
+          - for datasets listed in --augmented, keep ONE copy per Roboflow source stem
+            (siblings share '<stem>.rf.<hash>') so a rotated copy of a train image can never
+            land in val/test after our re-split. Opt-in only: un-augmented sets like vip reuse
+            generic names ('7_jpg' x38 different photos) and would lose real images.
           - split 80/10/10 with a fixed seed, write data.yaml
 Depends : pyyaml. No ultralytics needed.
 Question you should be able to answer: why must all datasets share ONE class numbering before training?
-Usage   : python training/scripts/merge_datasets.py --raw training/data/raw --mappings training/mappings --out training/data/merged
+Usage   : python training/scripts/merge_datasets.py --raw training/data/raw --mappings training/mappings --out training/data/merged --augmented fukao
 """
 from __future__ import annotations
-import argparse, hashlib, json, random, shutil
+import argparse, hashlib, json, random, re, shutil
 from pathlib import Path
 import yaml
 
@@ -68,6 +72,11 @@ def split_name(index: int, n: int, seed: int) -> str:
     return "test"
 
 
+def source_stem(filename: str) -> str:
+    """'img_0520_jpg.rf.0e91e9b8...jpg' -> 'img_0520_jpg' (augmented copies share this)."""
+    return re.sub(r"\.rf\.[0-9a-f]+$", "", Path(filename).stem)
+
+
 def iter_pairs(source_dir: Path):
     """Yield (image_path, label_path) for every image in train/valid/test of a Roboflow export."""
     for split in ("train", "valid", "val", "test"):
@@ -79,10 +88,13 @@ def iter_pairs(source_dir: Path):
                 yield img, source_dir / split / "labels" / (img.stem + ".txt")
 
 
-def merge(raw_dir: Path, mappings_dir: Path, out_dir: Path, seed: int = 42) -> dict:
-    """Return {split: {class_name: instance_count}}."""
+def merge(raw_dir: Path, mappings_dir: Path, out_dir: Path, seed: int = 42,
+          augmented: frozenset[str] = frozenset()) -> dict:
+    """Return {split: {class_name: instance_count}}. `augmented` = dataset folder names whose
+    export contains Roboflow augmentation copies (see module docstring)."""
     items = []  # (new_name, image_path, remapped_label_lines)
     seen_hashes: set[str] = set()
+    seen_stems: set[tuple[str, str]] = set()  # (dataset, source stem)
     for source_dir in sorted(p for p in raw_dir.iterdir() if p.is_dir()):
         mapping_file = mappings_dir / f"{source_dir.name}.json"
         if not mapping_file.exists():
@@ -91,6 +103,9 @@ def merge(raw_dir: Path, mappings_dir: Path, out_dir: Path, seed: int = 42) -> d
         mapping = json.loads(mapping_file.read_text())
         names = load_source_names(source_dir)
         for img, lbl in iter_pairs(source_dir):
+            stem_key = (source_dir.name, source_stem(img.name))
+            if source_dir.name in augmented and stem_key in seen_stems:
+                continue
             digest = hashlib.md5(img.read_bytes()).hexdigest()
             if digest in seen_hashes:
                 continue
@@ -98,6 +113,7 @@ def merge(raw_dir: Path, mappings_dir: Path, out_dir: Path, seed: int = 42) -> d
             if not lines:
                 continue
             seen_hashes.add(digest)
+            seen_stems.add(stem_key)
             items.append((f"{source_dir.name}_{img.name}", img, lines))
 
     if out_dir.exists():
@@ -129,8 +145,10 @@ def main():
     ap.add_argument("--mappings", default="training/mappings")
     ap.add_argument("--out", default="training/data/merged")
     ap.add_argument("--seed", type=int, default=42)
+    ap.add_argument("--augmented", nargs="*", default=[], metavar="NAME",
+                    help="raw/ folder names exported from an augmented Roboflow version (e.g. fukao)")
     a = ap.parse_args()
-    counts = merge(Path(a.raw), Path(a.mappings), Path(a.out), a.seed)
+    counts = merge(Path(a.raw), Path(a.mappings), Path(a.out), a.seed, frozenset(a.augmented))
     for s, c in counts.items():
         print(s, sum(c.values()), "instances:", dict(sorted(c.items())))
 

@@ -61,3 +61,31 @@ def test_merge_remaps_dedupes_and_writes_yaml(tmp_path: Path):
     assert "stairs_up" in yaml_text and "train: images/train" in yaml_text
     total_stairs = sum(counts[s].get("stairs_up", 0) for s in counts)
     assert total_stairs == 2
+
+
+def test_source_stem_strips_roboflow_hash():
+    assert m.source_stem("img_0520_jpg.rf.0e91e9b89fda600866fe51d94f53fc08.jpg") == "img_0520_jpg"
+    assert m.source_stem("plain.jpg") == "plain"
+
+
+def test_merge_keeps_one_copy_per_roboflow_source_stem(tmp_path: Path):
+    # Roboflow "augmented" versions export N copies of each train image with the same
+    # stem and different .rf.<hash>; only the first must survive so a re-split can't leak.
+    raw = tmp_path / "raw"; raw.mkdir()
+    maps = tmp_path / "mappings"; maps.mkdir()
+    out = tmp_path / "merged"
+    _fake_dataset(raw, "ds", ["Person"], [
+        ("x_jpg.rf.aaaa.jpg", b"IMG1", "0 0.5 0.5 0.2 0.3\n"),
+        ("x_jpg.rf.bbbb.jpg", b"IMG1-rotated", "0 0.5 0.5 0.3 0.2\n"),  # augmented sibling
+        ("y_jpg.rf.cccc.jpg", b"IMG2", "0 0.5 0.5 0.2 0.3\n"),
+    ])
+    (maps / "ds.json").write_text(json.dumps({"Person": "person"}))
+
+    m.merge(raw, maps, out, seed=1, augmented=frozenset({"ds"}))
+    kept = sorted(p.name for s in ("train", "val", "test") for p in (out / "images" / s).glob("*.jpg"))
+    assert kept == ["ds_x_jpg.rf.aaaa.jpg", "ds_y_jpg.rf.cccc.jpg"]
+
+    # not flagged as augmented -> same-stem files are different photos, keep both
+    m.merge(raw, maps, out, seed=1)
+    kept = sorted(p.name for s in ("train", "val", "test") for p in (out / "images" / s).glob("*.jpg"))
+    assert len(kept) == 3
