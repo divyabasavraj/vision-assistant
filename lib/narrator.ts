@@ -125,12 +125,13 @@ export function createNarrator(cfg: NarratorConfig = NARRATOR_CONFIG) {
   const sideCount = (zone: Zone) => onScreen().filter((t) => zoneOf(t.box.cx) === zone).length;
 
   /**
-   * Where to go when the way ahead is blocked. Returns null for level changes: you cannot side-step a
-   * step — it is still there — and steering someone sideways beside stairs is worse than not advising.
+   * Where to go when the way ahead is blocked. Returns null for level changes (you cannot side-step a
+   * step — it is still there, and steering someone sideways beside stairs is worse than not advising)
+   * and for guides: a door ahead is where you are trying to go, so routing around it is backwards.
    * With both sides open, the emptier one wins; an exact tie always resolves left so it cannot dither.
    */
   function escape(blockerLabel: string): string | null {
-    if (LEVEL_CHANGE.has(blockerLabel)) return null;
+    if (LEVEL_CHANGE.has(blockerLabel) || GUIDES.has(blockerLabel)) return null;
     const left = sideBlocked("left"), right = sideBlocked("right");
     if (left && right) return "stop";
     if (left) return "go right";
@@ -192,9 +193,14 @@ export function createNarrator(cfg: NarratorConfig = NARRATOR_CONFIG) {
         return pick.phrase;
       }
       if (pendingClear && gapOk) {
-        const stillBlocked = tracks.some((t) => t.confirmed && t.missed === 0 && zoneOf(t.box.cx) === "ahead" && bucketOf(t.smoothH, cfg, t.label) === "close");
+        const visible = tracks.filter((t) => t.confirmed && t.missed === 0);
+        const stillBlocked = visible.some((t) => zoneOf(t.box.cx) === "ahead" && bucketOf(t.smoothH, cfg, t.label) === "close");
         pendingClear = false;
-        if (!stillBlocked) { lastPhraseAt = nowMs; return { text: "path clear", priority: 4, interrupt: false, zone: "ahead" }; }
+        // Only claim the centre is clear while we can still see something to be clear of. An empty
+        // frame means the camera stopped seeing, which is not the same as the obstacle going away —
+        // the phone may simply have turned. And the phrase says "ahead", not "path": all we know is
+        // what is in the middle third of one frame.
+        if (!stillBlocked && visible.length > 0) { lastPhraseAt = nowMs; return { text: "ahead clear", priority: 4, interrupt: false, zone: "ahead" }; }
       }
       return null;
     },

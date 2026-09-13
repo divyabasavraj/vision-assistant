@@ -6,6 +6,7 @@
  */
 import { useEffect, useState } from "react";
 import { Assistant, type AssistantState } from "@/lib/assistant";
+import { speechDiagnostics } from "@/lib/speech";
 import { CameraView } from "@/components/CameraView";
 import { Caption } from "@/components/Caption";
 import { TalkButton } from "@/components/TalkButton";
@@ -44,7 +45,7 @@ export default function Page() {
         <button type="button" className="flex-1 rounded-xl bg-gray-800/90 py-4 text-xl text-white" onClick={() => void assistant.handleCommand({ kind: "read" })} aria-label="Read text in view">Read</button>
       </div>
       <TalkButton onQuestion={(q) => void assistant.handleCommand({ kind: "ask", question: q })} />
-      <p className="absolute bottom-1 right-2 text-xs text-gray-400">{state.listening ? "🎤 say “vision, …”" : "🎤 off"} · restarts {state.sttRestarts} · {state.backend ?? "…"} {state.fps} fps · Q&A {state.lastAskMs} ms</p>
+      <p className="absolute bottom-1 right-2 text-xs text-gray-400">{state.listening ? "🎤 say “vision, …”" : "🎤 off"} · {speechDiagnostics()} · {state.backend ?? "…"} {state.fps} fps · Q&A {state.lastAskMs} ms</p>
     </main>
   );
 }

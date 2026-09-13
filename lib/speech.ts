@@ -7,8 +7,22 @@
 export type Recognizer = { start(): void; stop(): void };
 
 let speaking = false;
+let asked = 0;        // utterances handed to the browser
+let started = 0;      // utterances the browser actually began speaking
+let lastError = "";
 
 export function isSpeaking(): boolean { return speaking; }
+
+/**
+ * On-screen diagnostics, because speak() cannot tell us why it was silent. "tts 0/7" means the
+ * browser accepted seven utterances and started none of them — the words never left the phone.
+ * "tts 7/7" with no sound means they were spoken and something downstream muted them.
+ */
+export function speechDiagnostics(): string {
+  let voices = -1, paused = false;
+  try { voices = window.speechSynthesis.getVoices().length; paused = window.speechSynthesis.paused; } catch { /* not available */ }
+  return `tts ${started}/${asked} v${voices}${paused ? " PAUSED" : ""}${lastError ? " " + lastError : ""}`;
+}
 
 export function stopSpeaking(): void {
   window.speechSynthesis.cancel();
@@ -20,9 +34,10 @@ export function speak(text: string, opts: { interrupt?: boolean } = {}): Promise
     if (opts.interrupt) window.speechSynthesis.cancel();
     const u = new SpeechSynthesisUtterance(text);
     u.rate = 1.1;
-    u.onstart = () => { speaking = true; };
+    u.onstart = () => { speaking = true; started += 1; lastError = ""; };
     u.onend = () => { speaking = false; resolve(); };
-    u.onerror = () => { speaking = false; resolve(); };
+    u.onerror = (e) => { speaking = false; lastError = e.error || "error"; resolve(); };
+    asked += 1;
     window.speechSynthesis.speak(u);
   });
 }

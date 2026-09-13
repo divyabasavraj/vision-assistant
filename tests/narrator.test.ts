@@ -77,12 +77,23 @@ describe("narrator events", () => {
     expect(n.update([box("person", 0.5, 0.3)], 6000)?.text).toBe("person, ahead, near");
   });
 
-  it("says path clear when an ahead-close object disappears", () => {
+  it("says ahead clear when the blocker goes but the scene is still in view", () => {
+    const n = createNarrator();
+    const chair = box("chair", 0.1, 0.2, 1);
+    for (let t = 0; t < 300; t += 100) n.update([box("pole", 0.5, 0.85, 0), chair], t);
+    let out: Phrase | null = null;
+    for (let f = 0; f <= NARRATOR_CONFIG.dropAfterFrames; f++) out = n.update([chair], 3000 + f * 1000);
+    expect(out).toEqual({ text: "ahead clear", priority: 4, interrupt: false, zone: "ahead" });
+  });
+
+  it("stays silent when everything vanishes at once, because that means the camera moved", () => {
     const n = createNarrator();
     for (let t = 0; t < 300; t += 100) n.update([box("pole", 0.5, 0.85)], t);
+    // An empty frame is not evidence of a clear path. The pole may still be right in front of you
+    // and the phone simply turned away from it.
     let out: Phrase | null = null;
-    for (let f = 0; f <= NARRATOR_CONFIG.dropAfterFrames; f++) out = n.update([], 3000 + f * 100);  // 11 empty frames -> missed > 10
-    expect(out).toEqual({ text: "path clear", priority: 4, interrupt: false, zone: "ahead" });
+    for (let f = 0; f <= NARRATOR_CONFIG.dropAfterFrames; f++) out = n.update([], 3000 + f * 1000);
+    expect(out).toBeNull();
   });
 });
 
@@ -180,6 +191,11 @@ describe("escape direction", () => {
     const n = createNarrator();
     expect(confirm(n, [box("pole", 0.5, 0.85, 0), box("person", 0.15, 0.3, 1), box("person", 0.85, 0.3, 1)])?.text)
       .toBe("pole, ahead, close, stop");
+  });
+
+  it("does not tell you to walk around a door, which is where you are trying to go", () => {
+    const n = createNarrator();
+    expect(confirm(n, [box("door", 0.5, 0.7)])?.text).toBe("door, ahead, close");
   });
 
   it("never tells you to step around a level change, because you cannot", () => {
