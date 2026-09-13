@@ -463,7 +463,7 @@ git add training/scripts/merge_datasets.py training/tests/test_merge.py training
 git commit -m "feat(training): dataset merge script with remap, dedupe, deterministic split"
 ```
 
-- [ ] **Step 7: STUDENT — download datasets (time-boxed: 4 h total for Steps 7–9)**
+- [x] **Step 7: STUDENT — download datasets (time-boxed: 4 h total for Steps 7–9)**
 
 1. Make a free account at https://universe.roboflow.com.
 2. Search: "obstacle detection visually impaired", "stairs detection", "blind navigation", "sidewalk obstacle", "curb detection". Pick 2–3 datasets with: ≥ 1,000 images, classes overlapping our list, and a license that allows use (CC BY 4.0 is fine).
@@ -472,7 +472,7 @@ git commit -m "feat(training): dataset merge script with remap, dedupe, determin
 5. Open each `data.yaml`, read the `names:` list, and write `training/mappings/<short-name>.json`.
 Note the dataset URLs and licenses in `docs/journal/2026-09-11.md` (the report needs them).
 
-- [ ] **Step 8: STUDENT — run the merge and inspect**
+- [x] **Step 8: STUDENT — run the merge and inspect**
 
 ```bash
 source training/.venv/bin/activate
@@ -482,7 +482,7 @@ cat training/data/merged/counts.json
 Check: total images 3,000–6,000; every class with fewer than **100 train instances** → remove it from `TARGET_CLASSES` and from the mapping files, re-run. Write the final class list and counts in the journal.
 Open 10 random images with their labels to eyeball quality (quick way: `yolo` can plot — see Task 4 Step 1 notebook cell for `plot_labels`, or use Roboflow's preview).
 
-- [ ] **Step 9: Journal + viva + commit**
+- [x] **Step 9: Journal + viva + commit**
 
 Append to `docs/viva-prep.md`:
 ```markdown
@@ -695,15 +695,15 @@ import shutil; shutil.copy(f'{RUNS}/n640_v1/weights/best.onnx', '/content/drive/
 json.dump(classes, open('/content/drive/MyDrive/vision/labels.json', 'w'))
 ```
 
-- [ ] **Step 3: STUDENT — run all cells; while training, watch `results.csv` and the printed val mAP per epoch**
+- [x] **Step 3: STUDENT — run all cells; while training, watch `results.csv` and the printed val mAP per epoch**
 
 Expected: training ends by epoch ~30–50 (early stop `patience=10`); test mAP50 clearly above baseline on shared classes and > 0 on new classes. If mAP50 on any class < 0.2, note it — Task 9 addresses it.
 
-- [ ] **Step 4: STUDENT — bring results home**
+- [x] **Step 4: STUDENT — bring results home**
 
 Download from Drive: `best_v1.onnx` → `public/models/best.onnx`; `labels.json` → `public/models/labels.json`; `runs/n640_v1/results.csv`, `results.png`, `confusion_matrix.png` and `n640_v1_test.json` → `training/results/n640_v1/`. Download the notebook (File → Download .ipynb) → `training/train.ipynb`.
 
-- [ ] **Step 5: Sanity-check the ONNX file on the Mac**
+- [x] **Step 5: Sanity-check the ONNX file on the Mac**
 
 ```bash
 python - <<'PY'
@@ -717,7 +717,7 @@ PY
 ```
 Expected: `images [1, 3, 640, 640] output0 [1, <4+nc>, 8400]` and `(1, 4+nc, 8400)`. Write these numbers down — `detector.ts` relies on them.
 
-- [ ] **Step 6: Journal, viva, commit**
+- [x] **Step 6: Journal, viva, commit**
 
 Append to `docs/viva-prep.md`:
 ```markdown

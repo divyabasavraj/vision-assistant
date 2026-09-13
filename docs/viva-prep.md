@@ -43,3 +43,18 @@ From box height as a fraction of the frame: < 25% far, 25–50% near, > 50% clos
 
 ## Q: Why is the narrator a pure function with unit tests?
 Because it is the safety-relevant logic and it must behave the same on every phone. Feeding it fake box lists lets me prove each rule (confirm, rate limit, priority, clear) without a camera.
+
+## Q: What is fine-tuning and why not train from scratch?
+Fine-tuning starts from weights already trained on COCO (millions of boxes) and continues training on my ~7k images. Early layers already detect edges/textures/shapes; only the higher layers and the new output head need to adapt. From scratch, 7k images is far too few — the model would overfit and score badly.
+
+## Q: What does epoch, batch, patience mean?
+Epoch = one pass over all training images. Batch = images processed together per gradient step (32). Patience = stop if validation mAP has not improved for 10 epochs (early stopping, avoids overfitting and wasted time). My run never triggered it — val mAP was still improving at epoch 50.
+
+## Q: What is ONNX and why export?
+Open Neural Network Exchange — a framework-neutral file describing the network graph and weights. The browser cannot run PyTorch, but ONNX Runtime Web can run ONNX using WebGPU or WebAssembly.
+
+## Q: What does the model output look like?
+One tensor 1×(4+nc)×8400 = 1×19×8400 for my 15 classes: for each of 8400 candidate positions, a box (cx, cy, w, h in input pixels) plus one score per class. We keep positions whose best class score passes a threshold and remove overlapping duplicates with NMS.
+
+## Q: What did fine-tuning achieve?
+Test mAP50 went from ≈0.26 (COCO model, 0 on 7 of my classes) to 0.667 after 50 epochs on a T4 (1.7 h). Door 0.95 and stairs-up 0.92 are the best; bicycle, pole, curb and crosswalk sit around 0.45–0.52 and are the targets for the second run.
