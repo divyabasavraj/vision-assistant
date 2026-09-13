@@ -1620,7 +1620,7 @@ git add -A && git commit -m "feat(app): in-browser YOLO11n via ONNX Runtime Web 
 - Consumes: `Box` from Task 6.
 - Produces: `NARRATOR_CONFIG`, `type Phrase = { text: string; priority: 1|2|3|4; interrupt: boolean }`, `createNarrator(cfg?): { update(boxes: Box[], nowMs: number): Phrase | null; reset(): void }`, helpers `zoneOf(cx)`, `bucketOf(h, cfg)`, `phraseFor(label, zone, bucket)`.
 
-- [ ] **Step 1: Failing tests**
+- [x] **Step 1: Failing tests**
 
 Create `tests/narrator.test.ts`:
 ```ts
@@ -1692,9 +1692,9 @@ describe("narrator events", () => {
 });
 ```
 
-- [ ] **Step 2: Run to verify it fails** — `npm test` → FAIL "Cannot find module '../lib/narrator'".
+- [x] **Step 2: Run to verify it fails** — `npm test` → FAIL "Cannot find module '../lib/narrator'".
 
-- [ ] **Step 3: Implement `lib/narrator.ts`**
+- [x] **Step 3: Implement `lib/narrator.ts`**
 
 ```ts
 /**
@@ -1819,9 +1819,9 @@ export function createNarrator(cfg: NarratorConfig = NARRATOR_CONFIG) {
 }
 ```
 
-- [ ] **Step 4: Run tests** — `npm test` → Expected: all narrator tests pass. If the "path clear" test fails on timing, check that `dropAfterFrames` frames of misses have elapsed (`missed > 10` needs 11 empty frames — the test loops `f = 0..10`, i.e. 11 frames).
+- [x] **Step 4: Run tests** — `npm test` → Expected: all narrator tests pass. If the "path clear" test fails on timing, check that `dropAfterFrames` frames of misses have elapsed (`missed > 10` needs 11 empty frames — the test loops `f = 0..10`, i.e. 11 frames).
 
-- [ ] **Step 5: Wire into `lib/assistant.ts`**
+- [x] **Step 5: Wire into `lib/assistant.ts`**
 
 ```ts
 import { createNarrator } from "./narrator";

@@ -34,3 +34,12 @@ Two ways ONNX Runtime Web can run the network in a browser: WebGPU uses the phon
 
 ## Q: How do you know your decode/NMS code is right?
 I ran the same ONNX file through ultralytics' own predict() and through my TypeScript decodeOutput+nms on one test image with identical thresholds: same 7 boxes, same classes, scores equal to 2 decimals, corners within half a pixel.
+
+## Q: How does the app decide when to speak?
+It tracks each object across frames by matching boxes of the same class with IoU ≥ 0.4. An object must be seen 3 frames in a row before it counts (removes flicker). It speaks only on events: new object, got closer (box height crossed a bucket), moved into the middle third, or the path became clear. At most one phrase per 1.5 s; an object ahead and close can interrupt. Same object is not repeated within 5 s unless it got closer.
+
+## Q: How do you estimate distance without a depth sensor?
+From box height as a fraction of the frame: < 25% far, 25–50% near, > 50% close. It is a rough proxy (a child and an adult differ) — listed as a limitation.
+
+## Q: Why is the narrator a pure function with unit tests?
+Because it is the safety-relevant logic and it must behave the same on every phone. Feeding it fake box lists lets me prove each rule (confirm, rate limit, priority, clear) without a camera.

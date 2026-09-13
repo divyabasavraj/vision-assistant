@@ -1,7 +1,7 @@
 /**
  * Purpose : The conductor. Owns the camera, the mouth (TTS) and the ears (trigger-word listener),
  *           and later the detector, narrator and Q&A. React only renders what this class reports via onState.
- * Depends : lib/frameSource.ts, lib/speech.ts, lib/listener.ts, lib/voiceCommands.ts, lib/detector.ts.
+ * Depends : lib/frameSource.ts, lib/speech.ts, lib/listener.ts, lib/voiceCommands.ts, lib/detector.ts, lib/narrator.ts.
  * Question you should be able to answer: why keep this logic out of the React component?
  */
 import { CameraFrameSource, type FrameSource } from "./frameSource";
@@ -9,6 +9,7 @@ import { speak, isSpeaking, stopSpeaking } from "./speech";
 import { startWakeWordListener } from "./listener";
 import type { Command } from "./voiceCommands";
 import { Detector, type Box } from "./detector";
+import { createNarrator } from "./narrator";
 
 export type AssistantState = {
   status: "idle" | "starting" | "running" | "error";
@@ -30,6 +31,8 @@ export class Assistant {
   private detector: Detector | null = null;
   private loopTimer: number | null = null;
   private frameTimes: number[] = [];
+  private narrator = createNarrator();
+  private answering = false;   // true while a question is being answered (Task 8) — narration yields
 
   constructor(private onState: (s: AssistantState) => void, frames?: FrameSource) {
     this.frames = frames ?? new CameraFrameSource();
@@ -94,16 +97,22 @@ export class Assistant {
     if (this.state.status === "running") this.scheduleLoop();
   }
 
-  // Hook for the narration engine (filled in Task 7).
-  protected onBoxes(boxes: Box[], nowMs: number): void { void boxes; void nowMs; }
+  // Narration: the narrator decides if these boxes are worth a phrase; we only decide whether we may speak now.
+  protected onBoxes(boxes: Box[], nowMs: number): void {
+    if (this.state.narrationPaused || this.answering) return;
+    const phrase = this.narrator.update(boxes, nowMs);
+    if (!phrase) return;
+    if (isSpeaking() && !phrase.interrupt) return;   // don't pile up phrases while one is still being spoken
+    void this.say(phrase.text, phrase.interrupt);
+  }
 
   async say(text: string, interrupt = false): Promise<void> {
     this.set({ caption: text });
     await speak(text, { interrupt });
   }
 
-  pauseNarration(): void { this.set({ narrationPaused: true }); void this.say("paused", true); }
-  resumeNarration(): void { this.set({ narrationPaused: false }); void this.say("listening", true); }
+  pauseNarration(): void { this.set({ narrationPaused: true }); this.narrator.reset(); void this.say("paused", true); }
+  resumeNarration(): void { this.set({ narrationPaused: false }); this.narrator.reset(); void this.say("listening", true); }
 
   async handleCommand(cmd: Command): Promise<void> {
     switch (cmd.kind) {
