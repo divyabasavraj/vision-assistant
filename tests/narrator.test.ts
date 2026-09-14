@@ -8,9 +8,28 @@ describe("helpers", () => {
   it("zones by thirds", () => { expect(zoneOf(0.1)).toBe("left"); expect(zoneOf(0.5)).toBe("ahead"); expect(zoneOf(0.9)).toBe("right"); });
   it("buckets by height", () => { expect(bucketOf(0.1, NARRATOR_CONFIG)).toBe("far"); expect(bucketOf(0.3, NARRATOR_CONFIG)).toBe("near"); expect(bucketOf(0.7, NARRATOR_CONFIG)).toBe("close"); });
   it("formats phrases", () => {
-    expect(phraseFor("person", "left", "near")).toBe("person, left, near");
-    expect(phraseFor("stairs_down", "ahead", "far")).toBe("stairs down, ahead");   // level changes omit "far"
-    expect(phraseFor("stairs_down", "ahead", "close")).toBe("stairs down, ahead, close");
+    expect(phraseFor("person", "left", "near")).toBe("person on your left, a few steps away");
+    expect(phraseFor("person", "left", "close")).toBe("person right next to you, on the left");
+    expect(phraseFor("person", "ahead", "far")).toBe("person further ahead");
+    expect(phraseFor("person", "ahead", "near")).toBe("person a few steps ahead");
+    expect(phraseFor("person", "ahead", "close")).toBe("person right in front of you");
+    expect(phraseFor("stairs_down", "ahead", "far")).toBe("stairs going down ahead");   // level changes omit distance
+    expect(phraseFor("stairs_down", "ahead", "close")).toBe("stairs going down right in front of you");
+  });
+
+  // Six labels do not say themselves out loud. Bare "auto" is meaningless spoken, and an
+  // underscore read literally ("stairs underscore up") is worse than useless.
+  it("speaks label names the way a person would say them", () => {
+    expect(phraseFor("auto", "ahead", "near")).toBe("auto rickshaw a few steps ahead");
+    expect(phraseFor("crosswalk", "ahead", "near")).toBe("crossing a few steps ahead");
+    expect(phraseFor("stairs_up", "ahead", "close")).toBe("stairs going up right in front of you");
+  });
+
+  // The narrator filters far side-objects out before speaking, so this never reaches the ear today.
+  // It still must not claim "a few steps away" about something far off, or the fallback lies the day
+  // that filter changes.
+  it("does not call a far side-object a few steps away", () => {
+    expect(phraseFor("person", "right", "far")).toBe("person over on your right");
   });
 });
 
@@ -35,7 +54,7 @@ describe("narrator events", () => {
     const n = createNarrator();
     expect(n.update([box("person", 0.2, 0.3)], 0)).toBeNull();
     expect(n.update([box("person", 0.2, 0.3)], 100)).toBeNull();
-    expect(n.update([box("person", 0.2, 0.3)], 200)).toEqual({ text: "person, left, near", priority: 4, interrupt: false, zone: "left" });
+    expect(n.update([box("person", 0.2, 0.3)], 200)).toEqual({ text: "person on your left, a few steps away", priority: 4, interrupt: false, zone: "left" });
     expect(n.update([box("person", 0.2, 0.3)], 300)).toBeNull();
   });
 
@@ -52,20 +71,20 @@ describe("narrator events", () => {
     for (let t = 0; t < 300; t += 100) n.update([box("person", 0.2, 0.3)], t);
     // Smoothing means "close" takes two frames of real growth, not one jump. That is the point of it.
     expect(n.update([box("person", 0.2, 0.7)], 2000)).toBeNull();
-    expect(n.update([box("person", 0.2, 0.75)], 2100)).toEqual({ text: "person, left, close", priority: 2, interrupt: false, zone: "left" });
+    expect(n.update([box("person", 0.2, 0.75)], 2100)).toEqual({ text: "person right next to you, on the left", priority: 2, interrupt: false, zone: "left" });
   });
 
   it("rate-limits to one phrase per 1.5 s but lets priority 1 interrupt", () => {
     const n = createNarrator();
     const both = [box("chair", 0.2, 0.2, 1), box("table", 0.8, 0.2, 2)];
     for (let t = 0; t < 200; t += 100) n.update(both, t);
-    expect(n.update(both, 200)?.text).toBe("chair, left, near");
+    expect(n.update(both, 200)?.text).toBe("chair on your left, a few steps away");
     expect(n.update(both, 300)).toBeNull();                              // table waits
-    expect(n.update(both, 1800)?.text).toBe("table, right, near");        // 1.5 s later it speaks
+    expect(n.update(both, 1800)?.text).toBe("table on your right, a few steps away");        // 1.5 s later it speaks
     const pole = [...both, box("pole", 0.5, 0.85, 3)];
     for (let t = 1900; t < 2100; t += 100) n.update(pole, t);
     // chair blocks the left and table blocks the right, so there is genuinely nowhere to step.
-    expect(n.update(pole, 2100)).toEqual({ text: "pole, ahead, close, stop", priority: 1, interrupt: true, zone: "ahead" });
+    expect(n.update(pole, 2100)).toEqual({ text: "pole right in front of you, stop", priority: 1, interrupt: true, zone: "ahead" });
   });
 
   it("does not repeat the same object within 5 s unless closer", () => {
@@ -74,16 +93,16 @@ describe("narrator events", () => {
     // Drift into the middle third in steps small enough to keep IoU >= 0.4 (a teleport would be a new object).
     for (let t = 400, cx = 0.2; cx < 0.5; t += 100, cx += 0.06) expect(n.update([box("person", cx, 0.3)], t)).toBeNull();
     expect(n.update([box("person", 0.5, 0.3)], 2000)).toBeNull();                 // now "ahead" but < 5 s since spoken
-    expect(n.update([box("person", 0.5, 0.3)], 6000)?.text).toBe("person, ahead, near");
+    expect(n.update([box("person", 0.5, 0.3)], 6000)?.text).toBe("person a few steps ahead");
   });
 
-  it("says ahead clear when the blocker goes but the scene is still in view", () => {
+  it("says ahead is clear when the blocker goes but the scene is still in view", () => {
     const n = createNarrator();
     const chair = box("chair", 0.1, 0.2, 1);
     for (let t = 0; t < 300; t += 100) n.update([box("pole", 0.5, 0.85, 0), chair], t);
     let out: Phrase | null = null;
     for (let f = 0; f <= NARRATOR_CONFIG.dropAfterFrames; f++) out = n.update([chair], 3000 + f * 1000);
-    expect(out).toEqual({ text: "ahead clear", priority: 4, interrupt: false, zone: "ahead" });
+    expect(out).toEqual({ text: "ahead is clear", priority: 4, interrupt: false, zone: "ahead" });
   });
 
   it("stays silent when everything vanishes at once, because that means the camera moved", () => {
@@ -107,7 +126,7 @@ describe("far objects off to the side", () => {
     const n = createNarrator();
     n.update([box("person", 0.5, 0.1)], 0);
     n.update([box("person", 0.5, 0.1)], 100);
-    expect(n.update([box("person", 0.5, 0.1)], 200)?.text).toBe("person, ahead, far");
+    expect(n.update([box("person", 0.5, 0.1)], 200)?.text).toBe("person further ahead");
   });
 });
 
@@ -116,7 +135,7 @@ describe("height smoothing", () => {
     const n = createNarrator();
     for (let t = 0; t < 300; t += 100) n.update([box("person", 0.5, 0.24)], t);
     // Raw height 0.52 says "close"; the smoothed height (0.352) says "near", and near is what gets spoken.
-    expect(n.update([box("person", 0.5, 0.52)], 2300)?.text).toBe("person, ahead, near");
+    expect(n.update([box("person", 0.5, 0.52)], 2300)?.text).toBe("person a few steps ahead");
   });
 
   it("treats an impossible one-frame size jump as a different object, not an approach", () => {
@@ -135,7 +154,7 @@ describe("fast approach", () => {
       const p = n.update([box("car", 0.5, h)], i * 100);
       if (p) said.push(p.text);
     });
-    expect(said).toContain("car approaching fast, ahead, go left");
+    expect(said).toContain("car coming at you fast, go left");
   });
 
   it("interrupts, because a fast approach is priority 1", () => {
@@ -143,9 +162,9 @@ describe("fast approach", () => {
     let urgent: Phrase | null = null;
     [0.10, 0.13, 0.17, 0.22, 0.29].forEach((h, i) => {
       const p = n.update([box("car", 0.5, h)], i * 100);
-      if (p?.text.includes("approaching fast")) urgent = p;
+      if (p?.text.includes("coming at you fast")) urgent = p;
     });
-    expect(urgent).toEqual({ text: "car approaching fast, ahead, go left", priority: 1, interrupt: true, zone: "ahead" });
+    expect(urgent).toEqual({ text: "car coming at you fast, go left", priority: 1, interrupt: true, zone: "ahead" });
   });
 
   it("stays quiet when the object grows slowly", () => {
@@ -155,7 +174,7 @@ describe("fast approach", () => {
       const p = n.update([box("car", 0.5, h)], i * 1000);   // one frame per second
       if (p) said.push(p.text);
     });
-    expect(said.some((s) => s.includes("approaching fast"))).toBe(false);
+    expect(said.some((s) => s.includes("coming at you fast"))).toBe(false);
   });
 
   it("ignores a fast-growing object that is off to the side", () => {
@@ -165,7 +184,7 @@ describe("fast approach", () => {
       const p = n.update([box("car", 0.1, h)], i * 100);
       if (p) said.push(p.text);
     });
-    expect(said.some((s) => s.includes("approaching fast"))).toBe(false);
+    expect(said.some((s) => s.includes("coming at you fast"))).toBe(false);
   });
 });
 
@@ -178,46 +197,46 @@ describe("escape direction", () => {
 
   it("tells you which way to go when something close blocks the path", () => {
     const n = createNarrator();
-    expect(confirm(n, [box("pole", 0.5, 0.85)])?.text).toBe("pole, ahead, close, go left");
+    expect(confirm(n, [box("pole", 0.5, 0.85)])?.text).toBe("pole right in front of you, go left");
   });
 
   it("sends you to the clear side when one side is occupied", () => {
     const n = createNarrator();
     expect(confirm(n, [box("pole", 0.5, 0.85, 0), box("person", 0.15, 0.3, 1)])?.text)
-      .toBe("pole, ahead, close, go right");
+      .toBe("pole right in front of you, go right");
   });
 
   it("says stop when both sides are blocked too", () => {
     const n = createNarrator();
     expect(confirm(n, [box("pole", 0.5, 0.85, 0), box("person", 0.15, 0.3, 1), box("person", 0.85, 0.3, 1)])?.text)
-      .toBe("pole, ahead, close, stop");
+      .toBe("pole right in front of you, stop");
   });
 
   it("does not tell you to walk around a door, which is where you are trying to go", () => {
     const n = createNarrator();
-    expect(confirm(n, [box("door", 0.5, 0.7)])?.text).toBe("door, ahead, close");
+    expect(confirm(n, [box("door", 0.5, 0.7)])?.text).toBe("door right in front of you");
   });
 
   it("never tells you to step around a level change, because you cannot", () => {
     const n = createNarrator();
-    expect(confirm(n, [box("stairs_down", 0.5, 0.4)])?.text).toBe("stairs down, ahead, close");
+    expect(confirm(n, [box("stairs_down", 0.5, 0.4)])?.text).toBe("stairs going down right in front of you");
   });
 
   it("does not add a direction to routine, non-blocking phrases", () => {
     const n = createNarrator();
-    expect(confirm(n, [box("person", 0.2, 0.3)])?.text).toBe("person, left, near");
+    expect(confirm(n, [box("person", 0.2, 0.3)])?.text).toBe("person on your left, a few steps away");
   });
 
   it("does not treat a crosswalk as something blocking a side", () => {
     const n = createNarrator();
     expect(confirm(n, [box("pole", 0.5, 0.85, 0), box("crosswalk", 0.15, 0.1, 1)])?.text)
-      .toBe("pole, ahead, close, go left");
+      .toBe("pole right in front of you, go left");
   });
 
   it("does not let a far object block a side", () => {
     const n = createNarrator();
     expect(confirm(n, [box("pole", 0.5, 0.85, 0), box("person", 0.15, 0.1, 1), box("person", 0.85, 0.3, 2)])?.text)
-      .toBe("pole, ahead, close, go left");
+      .toBe("pole right in front of you, go left");
   });
 
   it("gives a way out of a fast approach as well", () => {
@@ -225,8 +244,8 @@ describe("escape direction", () => {
     let urgent: Phrase | null = null;
     [0.10, 0.13, 0.17, 0.22].forEach((h, i) => {
       const p = n.update([box("car", 0.5, h)], i * 100);
-      if (p?.text.includes("approaching fast")) urgent = p;
+      if (p?.text.includes("coming at you fast")) urgent = p;
     });
-    expect(urgent).toEqual({ text: "car approaching fast, ahead, go left", priority: 1, interrupt: true, zone: "ahead" });
+    expect(urgent).toEqual({ text: "car coming at you fast, go left", priority: 1, interrupt: true, zone: "ahead" });
   });
 });

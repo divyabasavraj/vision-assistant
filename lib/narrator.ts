@@ -49,15 +49,47 @@ export function bucketOf(h: number, cfg: NarratorConfig, label = ""): Bucket {
   const s = sizeScale(label);
   return h < cfg.nearHeight * s ? "far" : h < cfg.closeHeight * s ? "near" : "close";
 }
-/** Fixed shape "<what>, <where>, <how far>"; a far stairs/curb is still worth a heads-up but "far" adds nothing. */
+/**
+ * How each label should be said out loud. An underscore read literally ("stairs underscore up") is
+ * worse than useless, and a bare "auto" means nothing spoken - the dataset's name for an
+ * auto-rickshaw is written shorthand, not speech.
+ */
+const SPOKEN_NAME: Record<string, string> = {
+  stairs_up: "stairs going up",
+  stairs_down: "stairs going down",
+  auto: "auto rickshaw",
+  crosswalk: "crossing",
+};
+export function spokenName(label: string): string {
+  return SPOKEN_NAME[label] ?? label.replace(/_/g, " ");
+}
+
+/**
+ * A short spoken sentence, not a comma-list of tokens. Two reasons it reads this way.
+ *
+ * First, the buckets used to be spoken as their own names - "near" and "close" - and those are
+ * synonyms in English. Heard with no screen, at walking speed, they are indistinguishable, yet they
+ * are the difference between "be aware" and "you are about to walk into it". The distance now rides
+ * in phrases that cannot be confused: "a few steps away" against "right in front of you".
+ *
+ * Second, a screen reader renders every comma as a pause, so "car, ahead, close" arrives as three
+ * disconnected words. One clause speaks faster than the tokens it replaces, despite being longer.
+ *
+ * A far stairs/curb is still worth a heads-up, but saying how far adds nothing you can act on.
+ */
 export function phraseFor(label: string, zone: Zone, bucket: Bucket): string {
-  const name = label.replace(/_/g, " ");
-  if (LEVEL_CHANGE.has(label) && bucket === "far") return `${name}, ${zone}`;
-  return `${name}, ${zone}, ${bucket}`;
+  const name = spokenName(label);
+  if (LEVEL_CHANGE.has(label) && bucket === "far") return `${name} ahead`;
+  if (zone === "ahead") {
+    if (bucket === "close") return `${name} right in front of you`;
+    return bucket === "near" ? `${name} a few steps ahead` : `${name} further ahead`;
+  }
+  if (bucket === "close") return `${name} right next to you, on the ${zone}`;
+  return bucket === "near" ? `${name} on your ${zone}, a few steps away` : `${name} over on your ${zone}`;
 }
 /** Deliberately different wording so an urgent warning never sounds like routine narration. */
 export function approachPhraseFor(label: string): string {
-  return `${label.replace(/_/g, " ")} approaching fast, ahead`;
+  return `${spokenName(label)} coming at you fast`;
 }
 
 type Track = {
@@ -200,7 +232,7 @@ export function createNarrator(cfg: NarratorConfig = NARRATOR_CONFIG) {
         // frame means the camera stopped seeing, which is not the same as the obstacle going away —
         // the phone may simply have turned. And the phrase says "ahead", not "path": all we know is
         // what is in the middle third of one frame.
-        if (!stillBlocked && visible.length > 0) { lastPhraseAt = nowMs; return { text: "ahead clear", priority: 4, interrupt: false, zone: "ahead" }; }
+        if (!stillBlocked && visible.length > 0) { lastPhraseAt = nowMs; return { text: "ahead is clear", priority: 4, interrupt: false, zone: "ahead" }; }
       }
       return null;
     },
