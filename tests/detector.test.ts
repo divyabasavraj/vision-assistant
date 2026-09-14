@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { decodeOutput, iou, nms, computeLetterbox, toFrameBox, type RawBox } from "../lib/detector";
+import { decodeOutput, iou, nms, computeLetterbox, toFrameBox, thresholdsFor, SCORE_THRESHOLD, CLASS_THRESHOLD, type RawBox } from "../lib/detector";
 
 // Build a fake model output [4+nc, anchors] laid out row-major like ONNX gives it.
 function fakeOutput(nc: number, anchors: number, fill: (a: number) => number[] /* cx,cy,w,h,...scores */): Float32Array {
@@ -13,9 +13,46 @@ describe("decodeOutput", () => {
   it("keeps only anchors whose best class score passes the threshold", () => {
     // scores are powers of two so they survive Float32Array exactly and toEqual works
     const data = fakeOutput(2, 3, (a) => (a === 1 ? [100, 100, 50, 40, 0.125, 0.75] : [0, 0, 10, 10, 0.0625, 0.03125]));
-    const out = decodeOutput(data, 2, 3, 0.5);
+    const out = decodeOutput(data, 2, 3, [0.5, 0.5]);
     expect(out).toHaveLength(1);
     expect(out[0]).toEqual({ cls: 1, score: 0.75, x1: 75, y1: 80, x2: 125, y2: 120 });
+  });
+
+  // A single global bar cannot serve fifteen classes whose precision/recall curves point in
+  // opposite directions. See training/results/threshold_sweep.md.
+  it("applies each class its own threshold", () => {
+    // anchor 0 is class 0 at 0.375; anchor 1 is class 1 at 0.375. Same score, different bars.
+    const data = fakeOutput(2, 2, (a) => (a === 0 ? [10, 10, 4, 4, 0.375, 0] : [20, 20, 4, 4, 0, 0.375]));
+    const out = decodeOutput(data, 2, 2, [0.25, 0.5]);
+    expect(out).toHaveLength(1);
+    expect(out[0].cls).toBe(0);
+  });
+});
+
+describe("per-class thresholds", () => {
+  const LABELS = ["person", "dog", "car", "bicycle", "motorbike", "auto", "bus", "stairs_up", "stairs_down", "curb", "pole", "chair", "table", "door", "crosswalk"];
+
+  it("defaults every class to the global threshold", () => {
+    const t = thresholdsFor(["person", "pole", "crosswalk"]);
+    expect(t).toEqual([SCORE_THRESHOLD, SCORE_THRESHOLD, SCORE_THRESHOLD]);
+  });
+
+  // Measured: curb gives up 0.010 recall for 0.142 precision going 0.35 -> 0.50, the best trade
+  // in the table. Pole loses 0.118 recall for 0.123 precision, which is a bad deal for a walking
+  // aid, so pole stays on the global default.
+  it("raises curb above the default and leaves pole on it", () => {
+    const t = thresholdsFor(LABELS);
+    expect(t[LABELS.indexOf("curb")]).toBe(0.5);
+    expect(t[LABELS.indexOf("pole")]).toBe(SCORE_THRESHOLD);
+    expect(CLASS_THRESHOLD.curb).toBe(0.5);
+  });
+
+  it("uses 0.35 as the global default, not 0.5", () => {
+    expect(SCORE_THRESHOLD).toBe(0.35);
+  });
+
+  it("falls back to the default for a label it has never heard of", () => {
+    expect(thresholdsFor(["spaceship"])).toEqual([SCORE_THRESHOLD]);
   });
 });
 

@@ -10,12 +10,37 @@ export type Box = { cls: number; label: string; score: number; cx: number; cy: n
 export type RawBox = { cls: number; score: number; x1: number; y1: number; x2: number; y2: number };
 export type Letterbox = { scale: number; padX: number; padY: number; frameW: number; frameH: number };
 
-export const SCORE_THRESHOLD = 0.5;   // 0.35 narrated too many low-confidence guesses; see docs/journal
+/**
+ * Global score bar. Measured, not guessed: mean F1 over the 904-image test split peaks here (0.661)
+ * and falls to 0.642 at 0.5 - and F1 already flatters the higher bar, because it prices a miss and a
+ * false alarm the same. For a walking aid a missed pole is worse than an imagined one.
+ *
+ * This was 0.5 for a while, to stop low-confidence guesses being narrated. The narrator now does that
+ * job properly and for free: a spurious box flickers, so it never matches a track at IoU 0.4, never
+ * survives three consecutive frames, and is never spoken. A real object at 0.38 sits still and gets
+ * through. Filtering by confidence suppressed the noise by also suppressing the signal.
+ *
+ * See training/results/threshold_sweep.md.
+ */
+export const SCORE_THRESHOLD = 0.35;
+
+/**
+ * Classes whose measured curve wants a different operating point from the default. Only one so far,
+ * and it is the one the confusion matrix predicted wrong: curb gives up 0.010 recall for 0.142
+ * precision going 0.35 -> 0.50, the best trade in the table. Pole looks similar at a glance
+ * (+0.123 precision) but costs 0.118 recall to get it, so pole stays on the default.
+ */
+export const CLASS_THRESHOLD: Record<string, number> = { curb: 0.5 };
+
+/** Per-class bars in model class order, so decodeOutput can index by class id without a lookup. */
+export function thresholdsFor(labels: string[]): number[] {
+  return labels.map((l) => CLASS_THRESHOLD[l] ?? SCORE_THRESHOLD);
+}
 export const NMS_IOU = 0.45;
 export const ORT_VERSION = "1.29.0"; // keep equal to the version in package.json (npm ls onnxruntime-web)
 
 /** Model output is [4+nc, anchors]: rows 0-3 = cx,cy,w,h in input pixels, rows 4.. = one score per class. */
-export function decodeOutput(data: Float32Array, numClasses: number, numAnchors: number, scoreThreshold: number): RawBox[] {
+export function decodeOutput(data: Float32Array, numClasses: number, numAnchors: number, thresholds: number[]): RawBox[] {
   const out: RawBox[] = [];
   for (let a = 0; a < numAnchors; a++) {
     let cls = -1, score = 0;
@@ -23,7 +48,8 @@ export function decodeOutput(data: Float32Array, numClasses: number, numAnchors:
       const s = data[(4 + c) * numAnchors + a];
       if (s > score) { score = s; cls = c; }
     }
-    if (score < scoreThreshold) continue;
+    // The bar depends on which class won, so it cannot be applied until after the argmax.
+    if (cls < 0 || score < (thresholds[cls] ?? SCORE_THRESHOLD)) continue;
     const cx = data[a], cy = data[numAnchors + a], w = data[2 * numAnchors + a], h = data[3 * numAnchors + a];
     out.push({ cls, score, x1: cx - w / 2, y1: cy - h / 2, x2: cx + w / 2, y2: cy + h / 2 });
   }
@@ -73,7 +99,11 @@ export class Detector {
   private ctx: CanvasRenderingContext2D;
   private input: Float32Array;
 
+  /** Per-class bars, resolved once at load rather than per frame. */
+  public readonly thresholds: number[];
+
   private constructor(private ort: Ort, private session: Session, public labels: string[], public inputSize: number) {
+    this.thresholds = thresholdsFor(labels);
     this.canvas = document.createElement("canvas");
     this.canvas.width = this.canvas.height = inputSize;
     this.ctx = this.canvas.getContext("2d", { willReadFrequently: true })!;
@@ -121,7 +151,7 @@ export class Detector {
     const out = await this.session.run({ [this.session.inputNames[0]]: tensor });
     const t = out[this.session.outputNames[0]];
     const [, rows, anchors] = t.dims;           // [1, 4+nc, 8400]
-    const raw = decodeOutput(t.data as Float32Array, rows - 4, anchors, SCORE_THRESHOLD);
+    const raw = decodeOutput(t.data as Float32Array, rows - 4, anchors, this.thresholds);
     return nms(raw, NMS_IOU).map((r) => toFrameBox(r, lb, this.labels));
   }
 }

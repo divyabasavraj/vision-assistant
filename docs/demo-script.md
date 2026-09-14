@@ -5,9 +5,10 @@ that Act 2 resolves, so the architecture argument makes itself.
 
 ## The night before
 
-- [ ] **Phone-test the two unverified changes.** Does `SCORE_THRESHOLD = 0.5` still detect
-      curb / pole / crosswalk? Is the stereo cue on the correct side with earbuds in?
-      If curbs vanish, put the threshold back to 0.35 and commit. A working demo beats a tuned one.
+- [ ] **Stereo cue on the correct side with earbuds in?** Confirmed 2026-09-14.
+- [ ] **Threshold evidence.** Curb / pole / crosswalk cannot be shown live in a classroom,
+      so they are carried by the per-class table in Act 3 rather than by the camera. The
+      numbers come from a threshold sweep on the 904-image test split, not from val.
 - [ ] Record the **backup video**: one full successful run, ~90 s, on the phone.
 - [ ] Deploy to Vercel, or write down the LAN HTTPS URL and confirm laptop and phone
       share the network the room actually has.
@@ -40,7 +41,12 @@ Hold the phone at chest height. Show the screen: live boxes, labels, `wasm`, `5 
 
 Walk slowly toward a chair or a door. **Let it speak — don't talk over it.**
 
-Have someone stand in your path. Listen for: `person, ahead, close, go left`
+Have someone stand in your path. Listen for: `person right in front of you, go left`
+
+Then walk at the **door** instead. It says `door right in front of you` and stops there —
+no direction. Say why out loud: a door is where you are going, not something to be routed
+around. It is a one-line detail that shows the narrator was written for a walker, not for a
+benchmark.
 
 **The moment that lands:** switch on Airplane Mode. Keep walking. It keeps narrating.
 
