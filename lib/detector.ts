@@ -25,12 +25,16 @@ export type Letterbox = { scale: number; padX: number; padY: number; frameW: num
 export const SCORE_THRESHOLD = 0.35;
 
 /**
- * Classes whose measured curve wants a different operating point from the default. Only one so far,
- * and it is the one the confusion matrix predicted wrong: curb gives up 0.010 recall for 0.142
- * precision going 0.35 -> 0.50, the best trade in the table. Pole looks similar at a glance
- * (+0.123 precision) but costs 0.118 recall to get it, so pole stays on the default.
+ * Classes whose measured curve wants a different operating point from the default.
+ * - curb: the one the confusion matrix predicted wrong. Gives up 0.010 recall for 0.142 precision
+ *   going 0.35 -> 0.50, the best trade in the table. Pole looks similar at a glance (+0.123
+ *   precision) but costs 0.118 recall to get it, so pole stays on the default.
+ * - person: the model's favourite guess for anything upright it does not know (32% of background
+ *   false positives). Measured in the narrator's own bands, 0.40 keeps close-band recall at 0.816
+ *   exactly, loses 0.022 near, and removes 19% of false persons; 0.50 would cost 0.057 close recall,
+ *   the people right in front of you. See training/results/person_threshold.md.
  */
-export const CLASS_THRESHOLD: Record<string, number> = { curb: 0.5 };
+export const CLASS_THRESHOLD: Record<string, number> = { curb: 0.5, person: 0.4 };
 
 /** Per-class bars in model class order, so decodeOutput can index by class id without a lookup. */
 export function thresholdsFor(labels: string[]): number[] {

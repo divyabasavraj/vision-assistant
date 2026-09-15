@@ -33,7 +33,7 @@ describe("per-class thresholds", () => {
   const LABELS = ["person", "dog", "car", "bicycle", "motorbike", "auto", "bus", "stairs_up", "stairs_down", "curb", "pole", "chair", "table", "door", "crosswalk"];
 
   it("defaults every class to the global threshold", () => {
-    const t = thresholdsFor(["person", "pole", "crosswalk"]);
+    const t = thresholdsFor(["chair", "pole", "crosswalk"]);
     expect(t).toEqual([SCORE_THRESHOLD, SCORE_THRESHOLD, SCORE_THRESHOLD]);
   });
 
@@ -45,6 +45,14 @@ describe("per-class thresholds", () => {
     expect(t[LABELS.indexOf("curb")]).toBe(0.5);
     expect(t[LABELS.indexOf("pole")]).toBe(SCORE_THRESHOLD);
     expect(CLASS_THRESHOLD.curb).toBe(0.5);
+  });
+
+  // Measured in the narrator's bands (training/results/person_threshold.md): person at 0.40 keeps
+  // close-band recall at 0.816 exactly, loses 0.022 near, and drops 26 of 139 false persons. 0.50
+  // would cost 0.057 close recall — the people right in front of you — so it stops at 0.40.
+  it("raises person to 0.40, the last step before close-band recall starts to pay", () => {
+    expect(thresholdsFor(LABELS)[LABELS.indexOf("person")]).toBe(0.4);
+    expect(CLASS_THRESHOLD.person).toBe(0.4);
   });
 
   it("uses 0.35 as the global default, not 0.5", () => {
