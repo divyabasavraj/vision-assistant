@@ -282,6 +282,21 @@ describe("approaching and moving away", () => {
     expect(said.slice(1).map((p) => p.text)).toEqual(["person moving away, a few steps ahead"]);
   });
 
+  // Field test in a crowd, 2026-09-15: a person walking away was announced "coming at you fast".
+  // Solo tests never showed it because it needs two overlapping people: when the receding one is
+  // hidden for a frame by someone nearer, its track grabs the nearer box (IoU still >= 0.4), the
+  // tracked height jumps once, and a one-frame time-to-contact reads the jump as a lunge. A real
+  // approach grows frame after frame; a swap grows once and then stops.
+  it("does not mistake a track grabbing a nearer person's box for a fast approach", () => {
+    const n = createNarrator();
+    const said: string[] = [];
+    const a = { cls: 0, label: "person", score: 0.8, cx: 0.5, cy: 0.5, w: 0.13, h: 0.33 };
+    const b = { cls: 0, label: "person", score: 0.8, cx: 0.5, cy: 0.5, w: 0.19, h: 0.48 };   // IoU(a,b) = 0.47
+    const frames = [[a, b], [a, b], [a, b], [b], [b], [b], [b]];   // a is occluded from frame 3 on
+    frames.forEach((boxes, i) => { const p = n.update(boxes, i * 200); if (p) said.push(p.text); });
+    expect(said.some((t) => t.includes("coming at you fast"))).toBe(false);
+  });
+
   it("formats the motion phrases", () => {
     expect(phraseFor("person", "ahead", "near", "approaching")).toBe("person coming closer, a few steps ahead");
     expect(phraseFor("person", "ahead", "far", "receding")).toBe("person moving away, further ahead");

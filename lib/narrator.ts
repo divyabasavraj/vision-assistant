@@ -108,9 +108,8 @@ type Track = {
   id: number; label: string; box: Box;
   seen: number; missed: number; confirmed: boolean;
   smoothH: number;          // EMA of box height — every distance decision reads this, never box.h
-  prevH: number; prevT: number; updatedAt: number;   // previous smoothed sample, for the growth rate
-  clipped: boolean; prevClipped: boolean;            // box touched the top/bottom frame edge on this / the previous sample
-  hist: Sample[];                                    // smoothed samples over the last trendWindowMs, oldest first
+  updatedAt: number;
+  hist: Sample[];                                    // smoothed samples over the last trendWindowMs, oldest first; each notes whether the box touched the top/bottom frame edge
   spokenAt: number | null; spokenBucket: Bucket | null; spokenZone: Zone | null; spokenTrend: Trend | null;
   spokenApproachAt: number | null;
 };
@@ -147,10 +146,8 @@ export function createNarrator(cfg: NarratorConfig = NARRATOR_CONFIG) {
       }
       if (best >= 0) {
         t.box = boxes[best];
-        t.prevH = t.smoothH; t.prevT = t.updatedAt; t.prevClipped = t.clipped;
         t.smoothH = cfg.smoothAlpha * boxes[best].h + (1 - cfg.smoothAlpha) * t.smoothH;
-        t.clipped = isClippedVertically(boxes[best]);
-        t.hist.push({ h: t.smoothH, t: now, clipped: t.clipped });
+        t.hist.push({ h: t.smoothH, t: now, clipped: isClippedVertically(boxes[best]) });
         while (t.hist.length > 1 && t.hist[1].t <= now - cfg.trendWindowMs) t.hist.shift();   // keep one sample at/past the window edge
         t.updatedAt = now;
         t.seen += 1; t.missed = 0;
@@ -161,7 +158,7 @@ export function createNarrator(cfg: NarratorConfig = NARRATOR_CONFIG) {
     tracks = tracks.filter((t) => t.confirmed || t.missed === 0);
     for (const i of unmatched) {
       const b = boxes[i];
-      tracks.push({ id: nextId++, label: b.label, box: b, seen: 1, missed: 0, confirmed: false, smoothH: b.h, prevH: b.h, prevT: now, updatedAt: now, clipped: isClippedVertically(b), prevClipped: false, hist: [{ h: b.h, t: now, clipped: isClippedVertically(b) }], spokenAt: null, spokenBucket: null, spokenZone: null, spokenTrend: null, spokenApproachAt: null });
+      tracks.push({ id: nextId++, label: b.label, box: b, seen: 1, missed: 0, confirmed: false, smoothH: b.h, updatedAt: now, hist: [{ h: b.h, t: now, clipped: isClippedVertically(b) }], spokenAt: null, spokenBucket: null, spokenZone: null, spokenTrend: null, spokenApproachAt: null });
     }
     const dropped = tracks.filter((t) => t.missed > cfg.dropAfterFrames);
     if (dropped.some((t) => t.spokenZone === "ahead" && t.spokenBucket === "close")) pendingClear = true;
@@ -171,14 +168,21 @@ export function createNarrator(cfg: NarratorConfig = NARRATOR_CONFIG) {
   /**
    * Monocular time-to-contact: a box growing at rate dh/dt reaches you in about h / (dh/dt) seconds.
    * No depth sensor needed — only how fast the thing is filling the frame. Infinity = not approaching.
-   * Either sample touching the frame edge means the height was set by the frame, so there is no rate.
+   *
+   * The rate is taken over the last two intervals, not one. In a crowd a track that loses its box for
+   * a frame takes a nearer person's overlapping box instead, and that single jump looks exactly like a
+   * lunge; over two intervals the jump is halved while a real approach, which keeps growing, is not.
+   * Either end sample touching the frame edge means the height was set by the frame, so there is no rate.
    */
   function timeToContact(t: Track): number {
-    if (t.clipped || t.prevClipped) return Infinity;
-    const dt = (t.updatedAt - t.prevT) / 1000;
+    const n = t.hist.length;
+    if (n < 3) return Infinity;
+    const a = t.hist[n - 3], c = t.hist[n - 1];
+    if (a.clipped || c.clipped) return Infinity;
+    const dt = (c.t - a.t) / 1000;
     if (dt <= 0) return Infinity;
-    const rate = (t.smoothH - t.prevH) / dt;
-    return rate > 0 ? t.smoothH / rate : Infinity;
+    const rate = (c.h - a.h) / dt;
+    return rate > 0 ? c.h / rate : Infinity;
   }
 
   /**
