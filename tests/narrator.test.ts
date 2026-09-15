@@ -70,8 +70,10 @@ describe("narrator events", () => {
     const n = createNarrator();
     for (let t = 0; t < 300; t += 100) n.update([box("person", 0.2, 0.3)], t);
     // Smoothing means "close" takes two frames of real growth, not one jump. That is the point of it.
-    expect(n.update([box("person", 0.2, 0.7)], 2000)).toBeNull();
-    expect(n.update([box("person", 0.2, 0.75)], 2100)).toEqual({ text: "person right next to you, on the left", priority: 2, interrupt: false, zone: "left" });
+    // The jump does read as motion, so the first thing said is "coming closer" while still in the near band.
+    expect(n.update([box("person", 0.2, 0.7)], 2000)).toEqual({ text: "person coming closer, on your left", priority: 2, interrupt: false, zone: "left" });
+    expect(n.update([box("person", 0.2, 0.75)], 2100)).toBeNull();   // close now, but priority 2 waits out the 1.5 s gap
+    expect(n.update([box("person", 0.2, 0.75)], 3600)).toEqual({ text: "person right next to you, on the left", priority: 2, interrupt: false, zone: "left" });
   });
 
   it("rate-limits to one phrase per 1.5 s but lets priority 1 interrupt", () => {
@@ -135,7 +137,7 @@ describe("height smoothing", () => {
     const n = createNarrator();
     for (let t = 0; t < 300; t += 100) n.update([box("person", 0.5, 0.24)], t);
     // Raw height 0.52 says "close"; the smoothed height (0.352) says "near", and near is what gets spoken.
-    expect(n.update([box("person", 0.5, 0.52)], 2300)?.text).toBe("person a few steps ahead");
+    expect(n.update([box("person", 0.5, 0.52)], 2300)?.text).toBe("person coming closer, a few steps ahead");
   });
 
   it("treats an impossible one-frame size jump as a different object, not an approach", () => {
@@ -214,6 +216,78 @@ describe("fast approach", () => {
       if (p) said.push(p.text);
     });
     expect(said.some((s) => s.includes("coming at you fast"))).toBe(false);
+  });
+});
+
+describe("approaching and moving away", () => {
+  // Walk a confirmed track through a height sequence at 5 fps and collect everything it says.
+  const walk = (label: string, cx: number, hs: number[], stepMs = 200, n = createNarrator()) => {
+    const said: Phrase[] = [];
+    hs.forEach((h, i) => { const p = n.update([box(label, cx, h)], i * stepMs); if (p) said.push(p); });
+    return said;
+  };
+  const grow = (from: number, to: number, frames: number) => Array.from({ length: frames }, (_, i) => from + (to - from) * i / (frames - 1));
+
+  it("says a person is coming closer when they walk towards you at walking pace", () => {
+    // far and ahead, box height up 40 % over 2 s: nowhere near the 1.5 s time-to-contact, but clearly approaching
+    const said = walk("person", 0.5, grow(0.10, 0.14, 11));
+    expect(said[0].text).toBe("person further ahead");
+    const closer = said.find((p) => p.text.includes("coming closer"));
+    expect(closer).toEqual({ text: "person coming closer, further ahead", priority: 2, interrupt: false, zone: "ahead" });
+  });
+
+  it("says a person is moving away, and keeps saying so as they drop a distance band", () => {
+    const said = walk("person", 0.5, [0.45, 0.45, 0.45, ...grow(0.45, 0.15, 16)]);
+    expect(said[0].text).toBe("person a few steps ahead");
+    const texts = said.map((p) => p.text);
+    expect(texts).toContain("person moving away, a few steps ahead");
+    expect(texts).toContain("person moving away, further ahead");
+    expect(said.filter((p) => p.text.includes("moving away")).every((p) => p.priority === 4)).toBe(true);
+  });
+
+  it("puts the motion on a side object too", () => {
+    const said = walk("person", 0.15, grow(0.28, 0.40, 11));
+    expect(said[0].text).toBe("person on your left, a few steps away");
+    expect(said.map((p) => p.text)).toContain("person coming closer, on your left");
+  });
+
+  it("does not describe a pole as coming closer when you walk towards it", () => {
+    const said = walk("pole", 0.5, grow(0.10, 0.20, 11));
+    expect(said.some((p) => p.text.includes("coming closer") || p.text.includes("moving away"))).toBe(false);
+  });
+
+  it("does not report a slow drift as motion", () => {
+    const said = walk("person", 0.5, grow(0.30, 0.32, 11));   // +7 % over 2 s
+    expect(said.map((p) => p.text)).toEqual(["person a few steps ahead"]);
+  });
+
+  it("says each direction once, not every frame", () => {
+    const said = walk("person", 0.5, grow(0.10, 0.20, 26));   // approaching for 5 s straight
+    expect(said.filter((p) => p.text.includes("coming closer")).length).toBe(1);
+  });
+
+  it("does not read a box growing out of a clipped frame as coming closer", () => {
+    const n = createNarrator(); const said: string[] = [];
+    [0.45, 0.45, 0.45, 0.5, 0.55, 0.6, 0.65, 0.7, 0.75].forEach((h, i) => {
+      const p = n.update([{ cls: 0, label: "person", score: 0.9, cx: 0.5, cy: 1 - h / 2, w: 0.3, h }], i * 200);
+      if (p) said.push(p.text);
+    });
+    expect(said.some((s) => s.includes("coming closer"))).toBe(false);
+  });
+
+  it("does not repeat the urgent close-range warning when the person starts to leave", () => {
+    // stands close for a while, then walks off: the only thing said after the warning is "moving away"
+    const said = walk("person", 0.5, [...Array<number>(12).fill(0.6), ...grow(0.6, 0.3, 11)]);
+    expect(said[0].text).toBe("person right in front of you, go left");
+    expect(said.slice(1).map((p) => p.text)).toEqual(["person moving away, a few steps ahead"]);
+  });
+
+  it("formats the motion phrases", () => {
+    expect(phraseFor("person", "ahead", "near", "approaching")).toBe("person coming closer, a few steps ahead");
+    expect(phraseFor("person", "ahead", "far", "receding")).toBe("person moving away, further ahead");
+    expect(phraseFor("person", "right", "near", "receding")).toBe("person moving away, on your right");
+    expect(phraseFor("person", "ahead", "close", "approaching")).toBe("person right in front of you");   // urgent wording stays
+    expect(phraseFor("person", "ahead", "near", "still")).toBe("person a few steps ahead");
   });
 });
 

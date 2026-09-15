@@ -1,7 +1,8 @@
 /**
  * Purpose : Decide WHEN to speak and WHAT to say from a stream of boxes. Pure logic, no browser.
  *           Tracks objects across frames (IoU matching), confirms after 3 frames, speaks only on events
- *           (new / closer / in path / fast approach / clear), one phrase per 1.5 s, priority-1 may interrupt.
+ *           (new / closer / farther / in path / motion change / fast approach / clear), one phrase per 1.5 s,
+ *           priority-1 may interrupt.
  * Depends : Box type from lib/detector.ts. Tested in tests/narrator.test.ts.
  * Question you should be able to answer: why do we track objects instead of speaking every frame?
  */
@@ -19,10 +20,14 @@ export const NARRATOR_CONFIG = {
   smoothAlpha: 0.4,         // EMA weight on the newest height; one noisy frame must not move a bucket
   ttcWarnSec: 1.5,          // time-to-contact below this, straight ahead = urgent
   approachRepeatMs: 2000,   // don't repeat the same fast-approach warning more often than this
+  trendWindowMs: 1000,      // motion is judged against the smoothed height about this long ago
+  trendMinSpanMs: 600,      // ...but never against a sample younger than this: too little time to mean anything
+  trendRatio: 1.15,         // height up by this factor over the window = coming closer; down by it = moving away
 };
 export type NarratorConfig = typeof NARRATOR_CONFIG;
 export type Zone = "left" | "ahead" | "right";
 export type Bucket = "far" | "near" | "close";
+export type Trend = "approaching" | "receding" | "still";
 export type Phrase = { text: string; priority: 1 | 2 | 3 | 4; interrupt: boolean; zone: Zone };
 
 const MOVING = new Set(["person", "dog", "car", "bicycle", "motorbike", "auto", "bus"]);
@@ -76,15 +81,22 @@ export function spokenName(label: string): string {
  * disconnected words. One clause speaks faster than the tokens it replaces, despite being longer.
  *
  * A far stairs/curb is still worth a heads-up, but saying how far adds nothing you can act on.
+ *
+ * Motion rides inside the same sentence rather than as a phrase of its own, so a walking person costs
+ * one utterance, not two: "person coming closer, a few steps ahead". The close-range wording is left
+ * alone — it is the urgent one, and "coming closer" adds nothing to "right in front of you".
  */
-export function phraseFor(label: string, zone: Zone, bucket: Bucket): string {
+export function phraseFor(label: string, zone: Zone, bucket: Bucket, trend: Trend = "still"): string {
   const name = spokenName(label);
   if (LEVEL_CHANGE.has(label) && bucket === "far") return `${name} ahead`;
+  const motion = trend === "approaching" ? `${name} coming closer` : trend === "receding" ? `${name} moving away` : null;
   if (zone === "ahead") {
     if (bucket === "close") return `${name} right in front of you`;
-    return bucket === "near" ? `${name} a few steps ahead` : `${name} further ahead`;
+    const where = bucket === "near" ? "a few steps ahead" : "further ahead";
+    return motion ? `${motion}, ${where}` : `${name} ${where}`;
   }
   if (bucket === "close") return `${name} right next to you, on the ${zone}`;
+  if (motion) return `${motion}, on your ${zone}`;
   return bucket === "near" ? `${name} on your ${zone}, a few steps away` : `${name} over on your ${zone}`;
 }
 /** Deliberately different wording so an urgent warning never sounds like routine narration. */
@@ -98,10 +110,12 @@ type Track = {
   smoothH: number;          // EMA of box height — every distance decision reads this, never box.h
   prevH: number; prevT: number; updatedAt: number;   // previous smoothed sample, for the growth rate
   clipped: boolean; prevClipped: boolean;            // box touched the top/bottom frame edge on this / the previous sample
-  spokenAt: number | null; spokenBucket: Bucket | null; spokenZone: Zone | null;
+  hist: Sample[];                                    // smoothed samples over the last trendWindowMs, oldest first
+  spokenAt: number | null; spokenBucket: Bucket | null; spokenZone: Zone | null; spokenTrend: Trend | null;
   spokenApproachAt: number | null;
 };
-type Candidate = { track: Track; phrase: Phrase; bucket: Bucket; zone: Zone; approach: boolean };
+type Sample = { h: number; t: number; clipped: boolean };
+type Candidate = { track: Track; phrase: Phrase; bucket: Bucket; zone: Zone; trend: Trend; approach: boolean };
 
 /**
  * A box that touches the top or bottom of the frame has a height set by the frame, not by the distance.
@@ -136,6 +150,8 @@ export function createNarrator(cfg: NarratorConfig = NARRATOR_CONFIG) {
         t.prevH = t.smoothH; t.prevT = t.updatedAt; t.prevClipped = t.clipped;
         t.smoothH = cfg.smoothAlpha * boxes[best].h + (1 - cfg.smoothAlpha) * t.smoothH;
         t.clipped = isClippedVertically(boxes[best]);
+        t.hist.push({ h: t.smoothH, t: now, clipped: t.clipped });
+        while (t.hist.length > 1 && t.hist[1].t <= now - cfg.trendWindowMs) t.hist.shift();   // keep one sample at/past the window edge
         t.updatedAt = now;
         t.seen += 1; t.missed = 0;
         unmatched.delete(best);
@@ -145,7 +161,7 @@ export function createNarrator(cfg: NarratorConfig = NARRATOR_CONFIG) {
     tracks = tracks.filter((t) => t.confirmed || t.missed === 0);
     for (const i of unmatched) {
       const b = boxes[i];
-      tracks.push({ id: nextId++, label: b.label, box: b, seen: 1, missed: 0, confirmed: false, smoothH: b.h, prevH: b.h, prevT: now, updatedAt: now, clipped: isClippedVertically(b), prevClipped: false, spokenAt: null, spokenBucket: null, spokenZone: null, spokenApproachAt: null });
+      tracks.push({ id: nextId++, label: b.label, box: b, seen: 1, missed: 0, confirmed: false, smoothH: b.h, prevH: b.h, prevT: now, updatedAt: now, clipped: isClippedVertically(b), prevClipped: false, hist: [{ h: b.h, t: now, clipped: isClippedVertically(b) }], spokenAt: null, spokenBucket: null, spokenZone: null, spokenTrend: null, spokenApproachAt: null });
     }
     const dropped = tracks.filter((t) => t.missed > cfg.dropAfterFrames);
     if (dropped.some((t) => t.spokenZone === "ahead" && t.spokenBucket === "close")) pendingClear = true;
@@ -163,6 +179,21 @@ export function createNarrator(cfg: NarratorConfig = NARRATOR_CONFIG) {
     if (dt <= 0) return Infinity;
     const rate = (t.smoothH - t.prevH) / dt;
     return rate > 0 ? t.smoothH / rate : Infinity;
+  }
+
+  /**
+   * Is it coming or going? The time-to-contact above only fires for something that will hit you in
+   * 1.5 s; a person walking towards you at normal pace never trips it, yet "coming closer" is the
+   * single most useful thing to know about a person. Compare the smoothed height with the sample about
+   * a second ago. Only things that move on their own get a verdict: a pole does not approach, you do.
+   * A clipped sample at either end is no evidence — see isClippedVertically.
+   */
+  function trendOf(t: Track, now: number): Trend {
+    if (!MOVING.has(t.label) || t.hist.length < 2) return "still";
+    const base = t.hist[0], latest = t.hist[t.hist.length - 1];
+    if (now - base.t < cfg.trendMinSpanMs || base.clipped || latest.clipped) return "still";
+    const ratio = latest.h / base.h;
+    return ratio >= cfg.trendRatio ? "approaching" : ratio <= 1 / cfg.trendRatio ? "receding" : "still";
   }
 
   const onScreen = () => tracks.filter((t) => t.confirmed && t.missed === 0 && !GUIDES.has(t.label));
@@ -189,9 +220,9 @@ export function createNarrator(cfg: NarratorConfig = NARRATOR_CONFIG) {
     return sideCount("right") < sideCount("left") ? "go right" : "go left";
   }
 
-  function priorityOf(t: Track, zone: Zone, bucket: Bucket, closer: boolean): 1 | 2 | 3 | 4 {
+  function priorityOf(t: Track, zone: Zone, bucket: Bucket, closer: boolean, trend: Trend): 1 | 2 | 3 | 4 {
     if (zone === "ahead" && bucket === "close") return 1;
-    if (MOVING.has(t.label) && closer) return 2;
+    if (MOVING.has(t.label) && (closer || trend === "approaching")) return 2;
     if (LEVEL_CHANGE.has(t.label)) return 3;
     return 4;
   }
@@ -207,19 +238,26 @@ export function createNarrator(cfg: NarratorConfig = NARRATOR_CONFIG) {
       // Something far away and off to one side is not your problem — only the middle third is.
       if (bucket === "far" && zone !== "ahead") continue;
 
+      const trend = trendOf(t, now);
       const cooling = t.spokenApproachAt !== null && now - t.spokenApproachAt < cfg.approachRepeatMs;
       if (zone === "ahead" && !cooling && timeToContact(t) < cfg.ttcWarnSec) {
-        out.push({ track: t, zone, bucket, approach: true, phrase: { text: approachPhraseFor(t.label), priority: 1, interrupt: true, zone } });
+        out.push({ track: t, zone, bucket, trend, approach: true, phrase: { text: approachPhraseFor(t.label), priority: 1, interrupt: true, zone } });
         continue;
       }
 
       const isNew = t.spokenAt === null;
       const closer = t.spokenBucket !== null && BUCKET_RANK[bucket] > BUCKET_RANK[t.spokenBucket];
+      // The way out is worth hearing too, but only for things that move: a pole getting farther is you walking off.
+      const farther = MOVING.has(t.label) && t.spokenBucket !== null && BUCKET_RANK[bucket] < BUCKET_RANK[t.spokenBucket];
       const inPath = zone === "ahead" && t.spokenZone !== null && t.spokenZone !== "ahead";
-      if (!isNew && !closer && !inPath) continue;
-      if (!isNew && !closer && t.spokenAt !== null && now - t.spokenAt < cfg.repeatSameObjectMs) continue;
-      const priority = priorityOf(t, zone, bucket, closer);
-      out.push({ track: t, zone, bucket, approach: false, phrase: { text: phraseFor(t.label, zone, bucket), priority, interrupt: priority === 1, zone } });
+      // A change of motion is an event; coming to a standstill is not — "person stopped" is noise. Nor is
+      // motion at close range: that phrase cannot carry it, and re-firing the urgent warning as someone
+      // walks off is the opposite of what happened. The band drop that follows says "moving away".
+      const moved = !isNew && bucket !== "close" && trend !== "still" && trend !== t.spokenTrend;
+      if (!isNew && !closer && !farther && !inPath && !moved) continue;
+      if (!isNew && !closer && !farther && !moved && now - (t.spokenAt ?? -Infinity) < cfg.repeatSameObjectMs) continue;
+      const priority = priorityOf(t, zone, bucket, closer, trend);
+      out.push({ track: t, zone, bucket, trend, approach: false, phrase: { text: phraseFor(t.label, zone, bucket, trend), priority, interrupt: priority === 1, zone } });
     }
     return out;
   }
@@ -237,6 +275,8 @@ export function createNarrator(cfg: NarratorConfig = NARRATOR_CONFIG) {
           if (way) pick.phrase.text = `${pick.phrase.text}, ${way}`;
         }
         pick.track.spokenAt = nowMs; pick.track.spokenBucket = pick.bucket; pick.track.spokenZone = pick.zone;
+        // A fast-approach warning already said it is coming; do not follow it with "coming closer".
+        pick.track.spokenTrend = pick.approach ? "approaching" : pick.trend;
         if (pick.approach) pick.track.spokenApproachAt = nowMs;
         lastPhraseAt = nowMs;
         pendingClear = false;
