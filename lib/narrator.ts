@@ -174,14 +174,18 @@ export function createNarrator(cfg: NarratorConfig = NARRATOR_CONFIG) {
    * Where to go when the way ahead is blocked. Returns null for level changes (you cannot side-step a
    * step — it is still there, and steering someone sideways beside stairs is worse than not advising)
    * and for guides: a door ahead is where you are trying to go, so routing around it is backwards.
-   * With both sides open, the emptier one wins; an exact tie always resolves left so it cannot dither.
+   * With both sides open, the side with more room beside the blocker's own box wins: a person standing
+   * left of centre is walked around on the right, not into. Then the emptier side; an exact tie always
+   * resolves left so it cannot dither.
    */
-  function escape(blockerLabel: string): string | null {
-    if (LEVEL_CHANGE.has(blockerLabel) || GUIDES.has(blockerLabel)) return null;
+  function escape(blocker: Track): string | null {
+    if (LEVEL_CHANGE.has(blocker.label) || GUIDES.has(blocker.label)) return null;
     const left = sideBlocked("left"), right = sideBlocked("right");
     if (left && right) return "stop";
     if (left) return "go right";
     if (right) return "go left";
+    const roomLeft = blocker.box.cx - blocker.box.w / 2, roomRight = 1 - (blocker.box.cx + blocker.box.w / 2);
+    if (roomLeft !== roomRight) return roomLeft > roomRight ? "go left" : "go right";
     return sideCount("right") < sideCount("left") ? "go right" : "go left";
   }
 
@@ -229,7 +233,7 @@ export function createNarrator(cfg: NarratorConfig = NARRATOR_CONFIG) {
       if (pick && (gapOk || pick.phrase.priority === 1)) {
         // Only a priority-1 phrase means "genuinely blocked", and only then is a direction useful.
         if (pick.phrase.priority === 1) {
-          const way = escape(pick.track.label);
+          const way = escape(pick.track);
           if (way) pick.phrase.text = `${pick.phrase.text}, ${way}`;
         }
         pick.track.spokenAt = nowMs; pick.track.spokenBucket = pick.bucket; pick.track.spokenZone = pick.zone;

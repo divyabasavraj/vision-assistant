@@ -229,6 +229,16 @@ describe("escape direction", () => {
     expect(confirm(n, [box("pole", 0.5, 0.85)])?.text).toBe("pole right in front of you, go left");
   });
 
+  // Field test, 2026-09-15: someone stepped to the user's left and the phone said "go left". The
+  // tie-break ignored where the blocker itself sat inside the middle third, so anything left of
+  // centre still sent you left, into them. With both sides open, the side with more room wins.
+  it("sends you around the side of the blocker with more room", () => {
+    const wide = (cx: number): Box => ({ cls: 0, label: "person", score: 0.9, cx, cy: 0.5, w: 0.45, h: 0.7 });
+    expect(confirm(createNarrator(), [wide(0.4)])?.text).toBe("person right in front of you, go right");
+    expect(confirm(createNarrator(), [wide(0.6)])?.text).toBe("person right in front of you, go left");
+    expect(confirm(createNarrator(), [wide(0.5)])?.text).toBe("person right in front of you, go left");   // exact tie: left
+  });
+
   it("sends you to the clear side when one side is occupied", () => {
     const n = createNarrator();
     expect(confirm(n, [box("pole", 0.5, 0.85, 0), box("person", 0.15, 0.3, 1)])?.text)
