@@ -186,6 +186,35 @@ describe("fast approach", () => {
     });
     expect(said.some((s) => s.includes("coming at you fast"))).toBe(false);
   });
+
+  // Field test, 2026-09-15: a person standing about a metre away walked off, and the phone said
+  // "person coming at you fast". At that range a portrait phone cannot fit a whole person, so the
+  // detector boxes only the part it can see. As they back away, more of them comes into frame and the
+  // box GROWS for a few frames — which is exactly what an approach looks like to a height-only
+  // time-to-contact. A box touching the top or bottom edge has a height set by the frame, not by the
+  // distance, so it must never be evidence of approach.
+  it("does not call a person backing out of a clipped frame an approach", () => {
+    const n = createNarrator();
+    const said: string[] = [];
+    // bottom-anchored: feet are cut off by the frame edge (cy = 1 - h/2), 5 fps
+    [0.45, 0.45, 0.45, 0.70, 0.95, 0.90, 0.80].forEach((h, i) => {
+      const p = n.update([{ cls: 0, label: "person", score: 0.9, cx: 0.5, cy: 1 - h / 2, w: 0.3, h }], i * 200);
+      if (p) said.push(p.text);
+    });
+    expect(said.some((s) => s.includes("coming at you fast"))).toBe(false);
+  });
+
+  it("does not trust growth measured from a box that was clipped on the previous frame either", () => {
+    const n = createNarrator();
+    const said: string[] = [];
+    // head cut off at the top edge (cy = h/2), then the whole person fits and the box jumps up in one frame
+    const frames: Array<[number, number]> = [[0.5, 0.25], [0.5, 0.25], [0.5, 0.25], [0.9, 0.5], [0.85, 0.5], [0.8, 0.5]];
+    frames.forEach(([h, cy], i) => {
+      const p = n.update([{ cls: 0, label: "person", score: 0.9, cx: 0.5, cy, w: 0.3, h }], i * 200);
+      if (p) said.push(p.text);
+    });
+    expect(said.some((s) => s.includes("coming at you fast"))).toBe(false);
+  });
 });
 
 describe("escape direction", () => {

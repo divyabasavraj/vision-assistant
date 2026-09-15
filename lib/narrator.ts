@@ -97,10 +97,21 @@ type Track = {
   seen: number; missed: number; confirmed: boolean;
   smoothH: number;          // EMA of box height — every distance decision reads this, never box.h
   prevH: number; prevT: number; updatedAt: number;   // previous smoothed sample, for the growth rate
+  clipped: boolean; prevClipped: boolean;            // box touched the top/bottom frame edge on this / the previous sample
   spokenAt: number | null; spokenBucket: Bucket | null; spokenZone: Zone | null;
   spokenApproachAt: number | null;
 };
 type Candidate = { track: Track; phrase: Phrase; bucket: Bucket; zone: Zone; approach: boolean };
+
+/**
+ * A box that touches the top or bottom of the frame has a height set by the frame, not by the distance.
+ * Someone a metre away does not fit in a portrait phone; as they step back, more of them comes into
+ * view and the box GROWS while they move away. Growth from such a sample must never mean approach.
+ */
+export const EDGE_EPS = 0.01;
+export function isClippedVertically(b: Box): boolean {
+  return b.cy - b.h / 2 <= EDGE_EPS || b.cy + b.h / 2 >= 1 - EDGE_EPS;
+}
 
 const toRaw = (b: Box): RawBox => ({ cls: b.cls, score: b.score, x1: b.cx - b.w / 2, y1: b.cy - b.h / 2, x2: b.cx + b.w / 2, y2: b.cy + b.h / 2 });
 
@@ -122,8 +133,9 @@ export function createNarrator(cfg: NarratorConfig = NARRATOR_CONFIG) {
       }
       if (best >= 0) {
         t.box = boxes[best];
-        t.prevH = t.smoothH; t.prevT = t.updatedAt;
+        t.prevH = t.smoothH; t.prevT = t.updatedAt; t.prevClipped = t.clipped;
         t.smoothH = cfg.smoothAlpha * boxes[best].h + (1 - cfg.smoothAlpha) * t.smoothH;
+        t.clipped = isClippedVertically(boxes[best]);
         t.updatedAt = now;
         t.seen += 1; t.missed = 0;
         unmatched.delete(best);
@@ -133,7 +145,7 @@ export function createNarrator(cfg: NarratorConfig = NARRATOR_CONFIG) {
     tracks = tracks.filter((t) => t.confirmed || t.missed === 0);
     for (const i of unmatched) {
       const b = boxes[i];
-      tracks.push({ id: nextId++, label: b.label, box: b, seen: 1, missed: 0, confirmed: false, smoothH: b.h, prevH: b.h, prevT: now, updatedAt: now, spokenAt: null, spokenBucket: null, spokenZone: null, spokenApproachAt: null });
+      tracks.push({ id: nextId++, label: b.label, box: b, seen: 1, missed: 0, confirmed: false, smoothH: b.h, prevH: b.h, prevT: now, updatedAt: now, clipped: isClippedVertically(b), prevClipped: false, spokenAt: null, spokenBucket: null, spokenZone: null, spokenApproachAt: null });
     }
     const dropped = tracks.filter((t) => t.missed > cfg.dropAfterFrames);
     if (dropped.some((t) => t.spokenZone === "ahead" && t.spokenBucket === "close")) pendingClear = true;
@@ -143,8 +155,10 @@ export function createNarrator(cfg: NarratorConfig = NARRATOR_CONFIG) {
   /**
    * Monocular time-to-contact: a box growing at rate dh/dt reaches you in about h / (dh/dt) seconds.
    * No depth sensor needed — only how fast the thing is filling the frame. Infinity = not approaching.
+   * Either sample touching the frame edge means the height was set by the frame, so there is no rate.
    */
   function timeToContact(t: Track): number {
+    if (t.clipped || t.prevClipped) return Infinity;
     const dt = (t.updatedAt - t.prevT) / 1000;
     if (dt <= 0) return Infinity;
     const rate = (t.smoothH - t.prevH) / dt;
