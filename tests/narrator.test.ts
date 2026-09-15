@@ -137,7 +137,7 @@ describe("height smoothing", () => {
     const n = createNarrator();
     for (let t = 0; t < 300; t += 100) n.update([box("person", 0.5, 0.24)], t);
     // Raw height 0.52 says "close"; the smoothed height (0.352) says "near", and near is what gets spoken.
-    expect(n.update([box("person", 0.5, 0.52)], 2300)?.text).toBe("person coming closer, a few steps ahead");
+    expect(n.update([box("person", 0.5, 0.52)], 2300)?.text).toBe("person coming closer, a few steps ahead, go left");
   });
 
   it("treats an impossible one-frame size jump as a different object, not an approach", () => {
@@ -233,7 +233,7 @@ describe("approaching and moving away", () => {
     const said = walk("person", 0.5, grow(0.10, 0.14, 11));
     expect(said[0].text).toBe("person further ahead");
     const closer = said.find((p) => p.text.includes("coming closer"));
-    expect(closer).toEqual({ text: "person coming closer, further ahead", priority: 2, interrupt: false, zone: "ahead" });
+    expect(closer).toEqual({ text: "person coming closer, further ahead, go left", priority: 2, interrupt: false, zone: "ahead" });
   });
 
   it("says a person is moving away, and keeps saying so as they drop a distance band", () => {
@@ -333,6 +333,31 @@ describe("escape direction", () => {
   it("never tells you to step around a level change, because you cannot", () => {
     const n = createNarrator();
     expect(confirm(n, [box("stairs_down", 0.5, 0.4)])?.text).toBe("stairs going down right in front of you");
+  });
+
+  // Field test, 2026-09-15: the user wants the way out before the person is on top of them, not
+  // only at close range. A moving object approaching in the middle third (priority 2) gets it too.
+  it("gives a way out when something is coming closer in your path, before it is close", () => {
+    const n = createNarrator();
+    const said: Phrase[] = [];
+    // slightly right of centre, growing 40 % over 2 s: approaching, still in the far band
+    Array.from({ length: 11 }, (_, i) => 0.10 + 0.04 * i / 10).forEach((h, i) => {
+      const p = n.update([{ cls: 0, label: "person", score: 0.9, cx: 0.58, cy: 0.5, w: 0.2, h }], i * 200);
+      if (p) said.push(p);
+    });
+    const closer = said.find((p) => p.text.includes("coming closer"));
+    expect(closer).toEqual({ text: "person coming closer, further ahead, go left", priority: 2, interrupt: false, zone: "ahead" });
+  });
+
+  it("does not add a direction to something coming closer off to one side", () => {
+    const n = createNarrator();
+    const said: string[] = [];
+    Array.from({ length: 11 }, (_, i) => 0.28 + 0.12 * i / 10).forEach((h, i) => {
+      const p = n.update([box("person", 0.15, h)], i * 200);
+      if (p) said.push(p.text);
+    });
+    expect(said).toContain("person coming closer, on your left");
+    expect(said.some((t) => t.includes("go "))).toBe(false);
   });
 
   it("does not add a direction to routine, non-blocking phrases", () => {

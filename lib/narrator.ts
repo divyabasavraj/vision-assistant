@@ -269,8 +269,11 @@ export function createNarrator(cfg: NarratorConfig = NARRATOR_CONFIG) {
       const gapOk = nowMs - lastPhraseAt >= cfg.minGapMs;
       const pick = cands[0];
       if (pick && (gapOk || pick.phrase.priority === 1)) {
-        // Only a priority-1 phrase means "genuinely blocked", and only then is a direction useful.
-        if (pick.phrase.priority === 1) {
+        // A direction is useful when something is in your path: priority 1 (blocked now), or priority 2
+        // in the middle third (a moving thing coming closer — better to hear the way out before it is on
+        // top of you). Priority 2 off to one side gets none: it is not in the path, and "go right" there
+        // would only push you towards the road.
+        if (pick.phrase.priority === 1 || (pick.phrase.priority === 2 && pick.zone === "ahead")) {
           const way = escape(pick.track);
           if (way) pick.phrase.text = `${pick.phrase.text}, ${way}`;
         }
