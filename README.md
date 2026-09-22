@@ -21,6 +21,8 @@ pytest training/tests -q
 
 ## Documents
 
+- **Project log (start here):** `docs/PROJECT-LOG.md` — everything done so far, why and how, day by day
+- Results report: `training/results/REPORT.md` — dataset, training curves, test results with figures
 - Design spec: `docs/superpowers/specs/2026-09-11-vision-assistant-design.md`
 - Build plan: `docs/superpowers/plans/2026-09-11-vision-assistant-build.md`
 - Daily journal: `docs/journal/`
