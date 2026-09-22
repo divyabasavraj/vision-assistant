@@ -58,3 +58,6 @@ training/.env
 
 # local dev TLS certs (mkcert)
 certificates/
+
+# ablation artefact, reproduce with training/scripts/quantize.py
+public/models/best_int8.onnx
