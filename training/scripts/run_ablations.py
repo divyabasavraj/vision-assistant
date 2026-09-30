@@ -40,11 +40,21 @@ def main() -> None:
     p.add_argument("--runs", type=Path, default=RUNS, help="output directory")
     p.add_argument("--oversample", type=float, default=None,
                    help="repeat-factor threshold t for the train split (oversample.py); off by default")
+    # 'auto' ignores lr0 and picks by run length (>10k iterations SGD 0.01, else AdamW), which is
+    # how v2 silently switched optimizer from v1. Continuing from trained weights should pin both.
+    p.add_argument("--optimizer", default="auto", help="SGD / AdamW / auto (Ultralytics default)")
+    p.add_argument("--lr0", type=float, default=None, help="initial learning rate; ignored under auto")
+    p.add_argument("--warmup-epochs", type=float, default=None, help="default 3; 0 when fine-tuning on")
     args = p.parse_args()
 
     from ultralytics import YOLO  # imported late so --help is instant
 
     extra = dict(NO_AUG) if args.no_aug else {}
+    extra["optimizer"] = args.optimizer
+    if args.lr0 is not None:
+        extra["lr0"] = args.lr0
+    if args.warmup_epochs is not None:
+        extra["warmup_epochs"] = args.warmup_epochs
     # v1 used close_mosaic=10 of 50 epochs. Keep that 20%% ratio at every budget, otherwise a
     # short run would spend almost all of its epochs with mosaic already switched off and the
     # augmentation ablation would compare two nearly-unaugmented arms.
@@ -84,6 +94,7 @@ def main() -> None:
         "run": args.name, "base": args.base, "imgsz": args.imgsz, "epochs": args.epochs,
         "batch": args.batch, "augmentation": not args.no_aug, "device": args.device,
         "close_mosaic": close_mosaic, "oversample": args.oversample,
+        "optimizer": args.optimizer, "lr0": args.lr0, "warmup_epochs": args.warmup_epochs,
         "train_minutes": round(train_min, 1),
         "params": sum(q.numel() for q in best.model.parameters()),
         "map50": float(m.box.map50), "map50_95": float(m.box.map),

@@ -1,7 +1,7 @@
 """
 Purpose : Kaggle driver for Task 9 — unpack the merged dataset from the private Kaggle dataset
           `divyabasavraj25/vision-assistant-merged`, then run one job's arms with
-          run_ablations.py on the T4. JOB = "v2" (final candidate) or "ablations" (4 arms).
+          run_ablations.py on the T4. JOB = "v2" / "v3" (candidates) or "ablations" (4 arms).
 Depends : Kaggle GPU (T4) + internet (pip ultralytics, COCO weights). Everything lands in
           /kaggle/working/runs, which is what `kaggle kernels output` downloads.
 Question you should be able to answer: why is v2 a separate Kaggle run from the ablations?
@@ -17,7 +17,10 @@ import time
 import zipfile
 from pathlib import Path
 
-JOB = "v2"  # push.sh rewrites this line for the ablations run
+JOB = "v2"  # push.sh rewrites this line for the job being pushed
+# push.sh embeds the current training/scripts files here, so a script change does not need a new
+# version of the (large) Kaggle dataset. Empty = fall back to the copies uploaded with the dataset.
+SCRIPTS: dict[str, str] = {}
 
 W = Path("/kaggle/working")
 RUNS = W / "runs"
@@ -75,13 +78,19 @@ subprocess.run([sys.executable, "-m", "pip", "install", "-q", ULTRALYTICS], chec
 subprocess.run(["nvidia-smi", "--query-gpu=name,memory.total", "--format=csv"])
 (W / "scripts").mkdir(exist_ok=True)
 for f in ("run_ablations.py", "oversample.py"):
-    (W / "scripts" / f).write_bytes(find_input(f).read_bytes())
+    dst = W / "scripts" / f
+    dst.write_text(SCRIPTS[f]) if f in SCRIPTS else dst.write_bytes(find_input(f).read_bytes())
 DATA = prepare_data()
 
 if JOB == "v2":
     # Continue from v1 (still improving at epoch 50) on the repeat-factor-sampled train split.
     run("n640_v2", "--base", str(find_input("n640_v1_best.pt")), "--epochs", "30", "--batch", "32",
         "--oversample", "0.15")
+elif JOB == "v3":
+    # v2's lesson: continue v1 with v1's optimizer (SGD) at a tenth of its rate, no warm-up, and no
+    # oversampling, so the only change from v1 is 30 more epochs.
+    run("n640_v3", "--base", str(find_input("n640_v1_best.pt")), "--epochs", "30", "--batch", "32",
+        "--optimizer", "SGD", "--lr0", "0.001", "--warmup-epochs", "0")
 elif JOB == "ablations":
     # Same protocol as v2_decisions.md Decision 5: COCO start, 12 epochs, batch 16, no oversampling.
     run("n640_e12", "--epochs", "12", "--batch", "16")
