@@ -1,7 +1,7 @@
 /**
  * Purpose : The conductor. Owns the camera, the mouth (TTS) and the ears (trigger-word listener),
  *           and later the detector, narrator and Q&A. React only renders what this class reports via onState.
- * Depends : lib/frameSource.ts, lib/speech.ts, lib/listener.ts, lib/voiceCommands.ts, lib/detector.ts, lib/narrator.ts, lib/ask.ts.
+ * Depends : lib/frameSource.ts, lib/speech.ts, lib/listener.ts, lib/voiceCommands.ts, lib/detector.ts, lib/narrator.ts, lib/ask.ts, lib/eventLog.ts.
  * Question you should be able to answer: why keep this logic out of the React component?
  */
 import { CameraFrameSource, type FrameSource } from "./frameSource";
@@ -11,6 +11,7 @@ import type { Command } from "./voiceCommands";
 import { Detector, type Box } from "./detector";
 import { createNarrator, type Zone } from "./narrator";
 import { frameToJpeg, askServer } from "./ask";
+import { createEventLog, type LogKind, type LogEntry } from "./eventLog";
 
 /** Where each zone sits in the stereo field, for the cue tone that precedes every phrase. */
 const ZONE_PAN: Record<Zone, number> = { left: -0.8, ahead: 0, right: 0.8 };
@@ -46,9 +47,19 @@ export class Assistant {
   private frameTimes: number[] = [];
   private narrator = createNarrator();
   private answering = false;   // true while a question is being answered — narration yields
+  readonly log = createEventLog(() => performance.now());
 
   constructor(private onState: (s: AssistantState) => void, frames?: FrameSource) {
     this.frames = frames ?? new CameraFrameSource();
+  }
+
+  private record(kind: LogKind, text: string, extra: Omit<LogEntry, "t" | "kind" | "text"> = {}) {
+    this.log.record(kind, text, { backend: this.state.backend, fps: this.state.fps, ...extra });
+  }
+
+  /** The whole session as JSON, for docs/eval — see the Log button in app/page.tsx. */
+  exportLog(): string {
+    return this.log.toJSON({ exportedAt: new Date().toISOString(), userAgent: navigator.userAgent });
   }
 
   private set(patch: Partial<AssistantState>) {
@@ -82,7 +93,7 @@ export class Assistant {
       onCommand: (c) => void this.handleCommand(c),
       onTranscript: (t) => this.set({ heard: t }),
       shouldIgnore: () => isSpeaking(),
-      onRestart: (n) => this.set({ sttRestarts: n }),
+      onRestart: (n) => { this.set({ sttRestarts: n }); this.record("stt-restart", String(n)); },
       onUnsupported: () => this.set({ listening: false, caption: "Voice not supported here — use the button" }),
     });
     this.set({ listening: this.stopListening !== null });
@@ -137,6 +148,7 @@ export class Assistant {
     if (!phrase) return;
     if (isSpeaking() && !phrase.interrupt) return;   // don't pile up phrases while one is still being spoken
     cue(ZONE_PAN[phrase.zone]);
+    this.record("phrase", phrase.text);
     void this.say(phrase.text, phrase.interrupt);
   }
 
@@ -170,8 +182,11 @@ export class Assistant {
       const frame = this.frames.getFrame();
       if (!frame) { await this.say("camera not ready", true); return; }
       this.set({ caption: "asking…", heard: question });
+      this.record("ask", question);
       const result = await askServer(question, frameToJpeg(frame));
       this.set({ lastAskMs: result.ms });
+      if ("answer" in result) this.record("answer", result.answer, { ms: result.ms, provider: result.provider });
+      else this.record("error", result.error, { ms: result.ms });
       if ("answer" in result) await this.say(result.answer, true);
       else if (result.error === "offline") await this.say("no connection — questions need internet", true);
       else if (result.error === "retry") await this.say("please try again in a moment", true);

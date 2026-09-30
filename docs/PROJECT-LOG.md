@@ -294,6 +294,12 @@ swap rule (better mAP50 *and* no worse app recall) **v1 stays shipped**. Conclus
 was the cause of v2's drop, and v1 was already close to what this data and this model size can
 reach. The next gain has to come from data (distant stairs, poles, curbs), not epochs.
 
+**Task 11, same day (desk version).** Added `lib/eventLog.ts` and a **Log** button, which copies
+every phrase and Q&A round-trip, with timestamps, latency and provider, as JSON. Ran 30 held-out
+test images through the real `/api/ask`: 28 right, 1 partly, 1 wrong; median 3.5 s. Found that
+Gemini's free quota (limits of 5 and 20 requests) sends questions to Groq, and that the fallback costs ~8 s
+because rate-limit errors are retried first (§8.12).
+
 ---
 
 ## 3. Where things stand today
@@ -322,13 +328,14 @@ reach. The next gain has to come from data (distant stairs, poles, curbs), not e
 | `lib/voiceCommands.ts` | pause / resume / describe / read handled locally | Which commands never reach the server? |
 | `lib/assistant.ts` | Wires everything: state machine, detection loop, fps, `MicMode`, `onBoxes → narrator → speak` | What happens between a frame and a spoken phrase? |
 | `lib/ask.ts` | Client: frame → JPEG (≤ 640 px, q 0.7) → `POST /api/ask` | Why shrink the image? |
+| `lib/eventLog.ts` | Evaluation log: every phrase, question, answer (ms, provider), STT restart; **Log** button copies it as JSON | Why the clipboard, not an upload? |
 | `lib/server/askLogic.ts` | zod validation, ≤ 1 MB, 10/min per IP, fallback order — pure, tested | Why treat an empty answer as an error? |
 | `lib/server/providers.ts` | Gemini 3.6 Flash (thinking minimal) → Groq Qwen 3.8 27B via AI SDK | Why not call these from the phone? |
 | `app/api/ask/route.ts` | The one server function | Where do the API keys live? |
 | `components/CameraView.tsx` | Video + box overlay canvas | — |
 | `components/TalkButton.tsx` / `Caption.tsx` | Hold-to-talk backup; large-text caption of everything spoken | — |
 
-**Tests:** 70 Vitest tests in `tests/` (narrator, detector, askLogic, voiceCommands) + pytest for merge and baseline scripts. `tsc` and `eslint` clean.
+**Tests:** 73 Vitest tests in `tests/` (narrator, detector, askLogic, voiceCommands, eventLog) + pytest for merge and baseline scripts. `tsc` and `eslint` clean.
 
 ### Training folder
 
@@ -367,13 +374,15 @@ Vercel project `vision-assistant` (team *image-and-speech-recognition*). Every p
 | Crowd sim false "fast" warnings | 14 → 4 per 200 runs | commit `fe6b4ce` |
 | Phone fps (iPhone 13, wasm) | 5 | journal 2026-09-13 |
 | Q&A latency, Gemini / Groq | 3.5–4.5 s / 1.0 s | journal 2026-09-13 |
+| Q&A desk test: accuracy (30 test images) | 28 right, 1 partly, 1 wrong | `docs/eval/qa_sheet.csv` (§8.12) |
+| Q&A desk latency: median / p90 | 3.5 s / 9.4 s (Gemini 3.0 s median; Groq fallback 8.5 s) | same |
 | v2 test mAP50 / mAP50-95 | 0.653 / 0.447 (not shipped) | `training/results/n640_v2_eval.json` |
 | v2 app recall vs v1 | 0.535 vs 0.581 | same, and `n640_v1_eval.json` |
 | v3 test mAP50 / mAP50-95 | 0.670 / 0.467 (not shipped) | `training/results/n640_v3_eval.json` |
 | v3 app recall / close-band recall vs v1 | 0.573 / 0.778 vs 0.581 / 0.773 | same |
 | Ablation mAP50: control / 320 px / no aug / yolo11s | 0.634 / 0.567 / 0.601 / 0.675 | `training/results/ablation_runs/*_test.json` |
 | yolo11s ONNX / CPU latency | 37.9 MB / 47 ms (nano 10.6 MB / ~21 ms) | `training/results/s640_e12_eval.json` |
-| Unit tests | 70 | `npx vitest run` |
+| Unit tests | 73 | `npx vitest run` |
 
 ---
 
@@ -403,7 +412,7 @@ Vercel project `vision-assistant` (team *image-and-speech-recognition*). Every p
 
 - [x] **Task 9**: v2 trained (0.653, not shipped; v1 stays) and all four ablations run, 2026-09-30 (§8.8–8.9). Targeted data collection (distant stairs, hard negatives, curb) deferred as field work (Decision 4). Follow-up v3 = v1 + 30 epochs, SGD pinned, `lr0 0.001`, no warm-up, no oversampling: 0.670, not shipped (§8.8).
 - [~] **Task 10**: *dropped from scope 2026-09-30 to protect Tasks 11–13.* Was: wearable polish: Screen Wake Lock, earbud play/pause via Media Session, ARIA / screen-reader pass, blindfold test with a friend.
-- [ ] **Task 11** — evaluation collection: debug log of every phrase and Q&A with timestamps; 5–10 walking clips scored useful/redundant/wrong; 30 Q&A photos; end-to-end latency.
+- [x] **Task 11** (desk version, 2026-09-30): event log + Log button in the app; 30-image Q&A test through the real `/api/ask` with accuracy, latency and provider (§8.12). Walking clips and phone photos not done (no field work, by scope); the Log button is ready if a walk happens.
 - [ ] **Task 12** — report per spec §7 (nine items), slides, backup demo video.
 - [ ] **Task 13** — rehearse on the actual phone and Wi-Fi; re-read viva-prep; be able to explain every `lib/` file.
 - Open question: why does WebGPU not engage on iOS Safari (stuck on wasm at 5 fps)?
@@ -720,6 +729,68 @@ augmentation in fp32 is `n640_v1`, trained for 50 epochs. The only arm that beat
    Q&A tier is the open-set backup.
 5. **No end-user study.** Field walks by the developer, not a blind-user evaluation — future work.
 
+### 8.12 Application evaluation: Q&A accuracy and latency (Task 11, desk version)
+
+**Scope.** The plan asked for walking clips and 30 phone photos. By scope decision (no field work)
+this was done at the desk instead, through the *same code path the phone uses*: the real
+`/api/ask` route (validation, rate limit, Gemini → Groq fallback), run locally with the production
+keys. What is **not** measured: narration precision on real walks (needs clips), and phone-side
+costs (camera capture, JPEG encoding, mobile network).
+
+**Method.** 30 test-split images, 2 per class (for pole, the only two that qualified), each one's
+dominant object covering ≥ 8 % of the frame, shrunk to 640 px JPEG q 0.7 exactly as `lib/ask.ts`
+does. The same question for all 30, the one a blind user would actually ask: *"What is directly in
+front of me?"* Verdict: **right** if the answer names the labelled object correctly, **partly** if
+it names it but misreads the scene, **wrong** otherwise. One request every 6.5 s to stay under the
+route's own 10/min limit. Images: `docs/eval/qa_images/`; every answer: `docs/eval/qa_sheet.csv`.
+
+**Accuracy: 28 right, 1 partly, 1 wrong (93 % right).**
+
+- *Partly* (#1, person): a selfie, answered "you are taking a selfie". The model assumed the
+  camera holder is in the photo. A stock-photo artefact; a worn phone camera never sees its user.
+- *Wrong* (#7, bicycle): a clean bicycle on white, answered by **Groq** as "a small table with a
+  box of tissues". A plain hallucination, on the easiest image in the set. The same class's other
+  image, also answered by Groq, was right. One case, so it is a warning, not a measurement: the
+  fallback model is less reliable than the primary.
+- Beyond the question: #14 read the bus's destination board ("17 LONG BIÊN – NỘI BÀI"), stairs
+  answers always gave direction (up/down), and #29–30 named the zebra crossing: the open-set tier
+  does what the 15-class detector cannot.
+
+**Latency (server round-trip, laptop on home Wi-Fi):**
+
+| | n | median | mean | p90 | range |
+|---|---:|---:|---:|---:|---:|
+| all | 30 | 3.5 s | 5.7 s | 9.4 s | 2.5–19.7 s |
+| answered by Gemini | 21 | 3.0 s | 3.7 s | 5.2 s | 2.5–9.8 s |
+| answered by Groq (after Gemini failed) | 9 | 8.5 s | 10.2 s | 13.0 s | 7.9–19.7 s |
+
+**The finding that matters: Gemini's free tier runs out during normal use.** 9 of 30 questions
+fell through to Groq, every one because of Gemini quota errors
+(`generate_content_free_tier_requests`; the errors cite limits of 5 and 20, the free tier's short-window and daily caps). So:
+
+1. **The fallback works.** No question went unanswered; the user heard an answer every time.
+2. **But falling back is slow: 8.5 s, not Groq's 1.0 s.** When the Gemini key was deliberately
+   broken (Sep 13), Groq answered in 1.0 s because an auth error fails at once. A quota error
+   (HTTP 429) is *retried* by the AI SDK, 3 attempts with back-off, before our fallback ever
+   runs. The Groq rows are mostly time spent waiting on Gemini.
+3. **For the demo:** after ~20 questions in a day, every answer comes from Groq, and ~1 in 10
+   Groq answers may be wrong. Fix options: set `maxRetries: 0` for Gemini so a quota error falls
+   through in under a second, or a paid Gemini key, or both.
+
+**Fix applied (same day): Gemini `maxRetries: 0`** (`lib/server/providers.ts`). Re-tested with 5
+images while Gemini's quota was still exhausted: every request now failed Gemini in one attempt
+(no more "Failed after 3 attempts") and Groq answered all 5 correctly, including the bicycle it
+got wrong before. Round-trips were 1.2 and 2.2 s for two, but 7.4, 15.2 and 15.5 s for the other
+three. That time was Groq itself, not Gemini. So the retry cost is gone, but Groq's free tier is
+uneven under load. Honest summary: with Gemini available, ~3 s; on fallback, 1–15 s. A paid Gemini
+key is the real fix for a demo day.
+
+**How to say it in the viva:** "I tested Q&A on 30 held-out images through the real server route.
+28 were right. The one wrong answer came from the fallback model. The test also showed that the
+free Gemini quota runs out after about 20 questions a day. The fallback caught every one, but it
+took 8 seconds instead of 1, because the SDK retries rate-limit errors before giving up. I turned
+those retries off for Gemini; the remaining delay is Groq's own free-tier speed."
+
 ### 8.11 Viva questions on evaluation — short answers
 
 - **What is mAP50?** Mean over classes of the area under the precision–recall curve, counting a box
@@ -742,5 +813,7 @@ augmentation in fp32 is `n640_v1`, trained for 50 epochs. The only arm that beat
   means ~2 fps on the phone, and its recall at the app's thresholds is lower anyway.
 - **What did the ablations show?** 640 px is worth 6.7 points and augmentation 3.3. int8 is smaller
   but slower on this hardware. The shipped configuration survives every one.
+- **How accurate is the Q&A?** 28/30 right on held-out images (§8.12); the wrong one came from the
+  fallback model. Median 3.5 s, p90 9.4 s; slow cases are all Gemini quota fall-throughs.
 - **What does the confusion matrix tell you?** Errors are misses (background column), not class
   confusions — so the fix is recall (more data, longer training, oversampling), not relabelling.

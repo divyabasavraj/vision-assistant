@@ -14,7 +14,7 @@ export function frameToJpeg(frame: Frame, maxSide = 640, quality = 0.7): string 
   return c.toDataURL("image/jpeg", quality).split(",")[1];
 }
 
-export type AskResult = { answer: string; ms: number } | { error: "retry" | "offline" | "server"; ms: number };
+export type AskResult = { answer: string; ms: number; provider?: string } | { error: "retry" | "offline" | "server"; ms: number };
 
 export async function askServer(question: string, imageBase64: string): Promise<AskResult> {
   const t0 = performance.now();
@@ -25,8 +25,8 @@ export async function askServer(question: string, imageBase64: string): Promise<
       method: "POST", headers: { "content-type": "application/json" },
       body: JSON.stringify({ question, image: imageBase64 }), signal: AbortSignal.timeout(35_000),   // server may try two providers at 15 s each
     });
-    const data = (await res.json()) as { answer?: string; error?: string };
-    if (res.ok && data.answer) return { answer: data.answer, ms: ms() };
+    const data = (await res.json()) as { answer?: string; error?: string; provider?: string };
+    if (res.ok && data.answer) return { answer: data.answer, ms: ms(), provider: data.provider };
     if (res.status === 429 || res.status === 503) return { error: "retry", ms: ms() };
     return { error: "server", ms: ms() };
   } catch {

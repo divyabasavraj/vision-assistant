@@ -39,6 +39,13 @@ export default function Page() {
         className="absolute right-2 top-2 z-10 rounded-xl bg-gray-900/85 px-4 py-3 text-base font-semibold text-white">
         {state.micMode === "always" ? "Mic: always on" : "Mic: hold to talk"}
       </button>
+      {/* Evaluation only: copies the session log (phrases, questions, latency) for docs/eval. The browser
+          cannot save files to the phone quietly, so the clipboard is the simplest way off the device. */}
+      <button type="button" aria-label="Copy debug log"
+        onClick={() => void navigator.clipboard.writeText(assistant.exportLog()).then(() => assistant.say("log copied", true), () => assistant.say("could not copy log", true))}
+        className="absolute left-2 top-2 z-10 rounded-xl bg-gray-900/85 px-3 py-3 text-base text-gray-300">
+        Log
+      </button>
       <Caption said={state.caption} heard={state.heard} />
       {state.status === "error" && <p role="alert" className="absolute inset-x-0 top-1/3 bg-red-800 p-4 text-xl text-white">{state.error}</p>}
       <div className="absolute inset-x-0 bottom-1/3 flex gap-2 p-2">

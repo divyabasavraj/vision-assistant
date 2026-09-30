@@ -13,7 +13,7 @@ import { SYSTEM_PROMPT, type Answerer } from "./askLogic";
 export const GEMINI_MODEL = "gemini-3.6-flash";   // 2.5-flash is closed to new accounts (Sep 2026)
 export const GROQ_MODEL = "qwen/qwen3.8-27b";   // llama-4-scout retired on Groq (Sep 2026); qwen3.8 accepts images
 
-function makeAnswerer(model: LanguageModel, providerOptions?: Parameters<typeof generateText>[0]["providerOptions"]): Answerer {
+function makeAnswerer(model: LanguageModel, providerOptions?: Parameters<typeof generateText>[0]["providerOptions"], maxRetries = 2): Answerer {
   return async (question, imageBase64) => {
     const { text } = await generateText({
       model,
@@ -21,6 +21,7 @@ function makeAnswerer(model: LanguageModel, providerOptions?: Parameters<typeof 
       messages: [{ role: "user", content: [{ type: "text", text: question }, { type: "file", mediaType: "image/jpeg", data: imageBase64 }] }],
       maxOutputTokens: 160,   // prompt asks for 1-2 sentences; 120 clipped mid-sentence in testing
       timeout: 15_000,
+      maxRetries,
       providerOptions,
     });
     return text;
@@ -29,5 +30,7 @@ function makeAnswerer(model: LanguageModel, providerOptions?: Parameters<typeof 
 
 // Gemini 3 "thinks" before answering by default — 10-20 s on a photo question. Minimal thinking is
 // plenty for "what is this / read this" and brings it back to ~3-5 s.
-export const geminiAnswerer: Answerer = makeAnswerer(google(GEMINI_MODEL), { google: { thinkingConfig: { thinkingLevel: "minimal" } } });
+// No retries: its usual failure is the free-tier quota (HTTP 429), which the SDK would retry 3 times
+// with back-off, ~7 s, before Groq got a turn. Failing at once lets the fallback answer in ~1 s.
+export const geminiAnswerer: Answerer = makeAnswerer(google(GEMINI_MODEL), { google: { thinkingConfig: { thinkingLevel: "minimal" } } }, 0);
 export const groqAnswerer: Answerer = makeAnswerer(groq(GROQ_MODEL));
