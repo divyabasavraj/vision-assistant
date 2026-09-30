@@ -46,7 +46,7 @@ mic ──► speech-to-text ──► "vision, …"? ──► POST /api/ask �
 | Sep 16 | 6 | Production `/api/ask` was failing: API keys were never set in Vercel. Fixed and verified live. | 0 (config) |
 | Sep 19 | 9 | Learning walkthrough sessions; `questions-log.md` started. | 0 |
 | Sep 22 | 12 | Results report (`training/results/REPORT.md`), labelled sample sheets, this log. Task 9 scaffolding (v2 decisions, ablation runner, int8). | 2 |
-| Sep 30 | 20 | Task 9 run on Kaggle T4: v2 (oversampled) 0.653 < v1 0.667, so **v1 stays shipped**. Four ablations: 640 px, nano and augmentation all justified. Unified `evaluate.py`. §8 evaluation study. | pending |
+| Sep 30 | 20 | Task 9 run on Kaggle T4: v2 (oversampled) 0.653 < v1 0.667, so **v1 stays shipped**. Four ablations: 640 px, nano and augmentation all justified. Unified `evaluate.py`. §8 evaluation study. v3 (optimizer pinned) 0.670, within noise and lower app recall, so v1 still ships. | 3 |
 
 (Days 2, 7, 8, 10, 11 had no project work recorded.)
 
@@ -286,6 +286,14 @@ yolo11s +0.041 but 2.3× slower and lower recall at the app thresholds. Full wri
 from trained weights, pin the optimizer, lower the learning rate and skip warm-up; never leave
 `optimizer: auto`, because it changes with run length. Change one thing per run.
 
+**v3, same day.** To test that diagnosis, v3 repeated v2 with only the training recipe fixed: SGD
+pinned, `lr0 0.001` (a tenth of v1's), no warm-up, no oversampling (`training/kaggle/`, 33 min on
+T4). The collapse is gone: val mAP50 was 0.667 after epoch 1 and ended at 0.689. But test mAP50 is
+0.670 vs 0.667, a gain within noise, and app recall dropped slightly (0.581 → 0.573), so under the
+swap rule (better mAP50 *and* no worse app recall) **v1 stays shipped**. Conclusion: the optimizer
+was the cause of v2's drop, and v1 was already close to what this data and this model size can
+reach. The next gain has to come from data (distant stairs, poles, curbs), not epochs.
+
 ---
 
 ## 3. Where things stand today
@@ -361,6 +369,8 @@ Vercel project `vision-assistant` (team *image-and-speech-recognition*). Every p
 | Q&A latency, Gemini / Groq | 3.5–4.5 s / 1.0 s | journal 2026-09-13 |
 | v2 test mAP50 / mAP50-95 | 0.653 / 0.447 (not shipped) | `training/results/n640_v2_eval.json` |
 | v2 app recall vs v1 | 0.535 vs 0.581 | same, and `n640_v1_eval.json` |
+| v3 test mAP50 / mAP50-95 | 0.670 / 0.467 (not shipped) | `training/results/n640_v3_eval.json` |
+| v3 app recall / close-band recall vs v1 | 0.573 / 0.778 vs 0.581 / 0.773 | same |
 | Ablation mAP50: control / 320 px / no aug / yolo11s | 0.634 / 0.567 / 0.601 / 0.675 | `training/results/ablation_runs/*_test.json` |
 | yolo11s ONNX / CPU latency | 37.9 MB / 47 ms (nano 10.6 MB / ~21 ms) | `training/results/s640_e12_eval.json` |
 | Unit tests | 70 | `npx vitest run` |
@@ -391,7 +401,7 @@ Vercel project `vision-assistant` (team *image-and-speech-recognition*). Every p
 
 ## 6. What is left (from the 13-task plan)
 
-- [x] **Task 9**: v2 trained (0.653, not shipped; v1 stays) and all four ablations run, 2026-09-30 (§8.8–8.9). Targeted data collection (distant stairs, hard negatives, curb) deferred as field work (Decision 4). Possible follow-up if time allows: v3 = v1 + 30 epochs, SGD pinned, `lr0 0.001`, no warm-up, no oversampling.
+- [x] **Task 9**: v2 trained (0.653, not shipped; v1 stays) and all four ablations run, 2026-09-30 (§8.8–8.9). Targeted data collection (distant stairs, hard negatives, curb) deferred as field work (Decision 4). Follow-up v3 = v1 + 30 epochs, SGD pinned, `lr0 0.001`, no warm-up, no oversampling: 0.670, not shipped (§8.8).
 - [~] **Task 10**: *dropped from scope 2026-09-30 to protect Tasks 11–13.* Was: wearable polish: Screen Wake Lock, earbud play/pause via Media Session, ARIA / screen-reader pass, blindfold test with a friend.
 - [ ] **Task 11** — evaluation collection: debug log of every phrase and Q&A with timestamps; 5–10 walking clips scored useful/redundant/wrong; 30 Q&A photos; end-to-end latency.
 - [ ] **Task 12** — report per spec §7 (nine items), slides, backup demo video.
@@ -614,6 +624,47 @@ for rare-class precision, which is the wrong trade for a walking aid. So I kept 
 to pin the optimizer, fine-tune at a tenth of v1's learning rate with no warm-up, and change one
 thing at a time."
 
+### 8.8b v3: the fix for v2, and what it shows
+
+**What v3 was.** v2's recipe with its two faults removed and nothing else changed: 30 epochs from
+`n640_v1/best.pt`, **SGD pinned, `lr0 0.001`, `warmup_epochs 0`, no oversampling**. Kaggle T4,
+33 min, 2026-09-30. Raw numbers: `training/results/n640_v3_eval.json`, curves in
+`training/results/n640_v3/`.
+
+| | v1 | v2 | v3 |
+|---|---:|---:|---:|
+| test mAP50 | 0.667 | 0.653 | **0.670** |
+| test mAP50-95 | 0.462 | 0.447 | **0.467** |
+| app precision | 0.737 | **0.757** | 0.739 |
+| app recall | **0.581** | 0.535 | 0.573 |
+| recall far / near / close | **0.406 / 0.650** / 0.773 | 0.353 / 0.599 / 0.739 | 0.396 / 0.624 / **0.778** |
+| val mAP50, epoch 3 → last | — | 0.567 → 0.682 | 0.671 → 0.689 |
+| ONNX / CPU latency | 10.6 MB / 21.9 ms | 10.6 MB / 20.1 ms | 10.6 MB / 22.4 ms |
+
+Per class, v3 gains on stairs_down (AP50 0.765 → 0.796), auto (0.544 → 0.585), table (0.638 →
+0.666) and door (0.950 → 0.970), and loses a little on person (0.561 → 0.542), pole (0.487 →
+0.474) and bus (0.830 → 0.813). Close-band recall for pole rose 0.842 → 0.895 and for stairs_down
+0.829 → 0.886, while person near-band recall fell 0.712 → 0.676.
+
+**Reading it.**
+
+1. **The v2 diagnosis was right.** With the same starting weights and the optimizer pinned, val
+   mAP never collapsed (v2 lost 0.12 in three epochs; v3 never went below 0.66). So the
+   drop in v2 was caused by the optimizer switch and warm-up, not by continuing training itself.
+2. **But there was little left to win.** +0.003 test mAP50 on 904 images is within run-to-run
+   noise. v1 had essentially converged; extra epochs on the same images at a small learning rate
+   only refine what is already there.
+3. **Why v3 is not shipped.** The swap rule set before the run was: better test mAP50 *and* no
+   worse app recall or close-band recall. v3 passes on mAP50 and close-band, but overall app
+   recall is 0.008 lower, mostly from near-band persons, the class the narrator speaks about most.
+   A tie on the headline metric with a small loss on the metric the user hears is not a reason to
+   change the deployed model.
+
+**How to say it in the viva:** "I tested my explanation for v2 by fixing only the optimizer. The
+collapse disappeared, which confirms the cause, but the result tied v1. That tells me the model
+had converged on this data, so the next improvement has to come from more data for the hard
+classes, not more training."
+
 ### 8.9 Ablations: what each design choice was worth
 
 Four arms, each changing **one** thing against a control. All start from COCO weights, train **12
@@ -684,6 +735,9 @@ augmentation in fp32 is `n640_v1`, trained for 50 epochs. The only arm that beat
 - **Why is v2 worse than v1?** `optimizer: auto` switched SGD → AdamW for the shorter run and warm-up re-ran (val mAP fell 0.688 →
   0.567 in 3 epochs, then only recovered to 0.682), and oversampling traded common-class recall for
   rare-class precision. Negative result, kept v1.
+- **Did fixing the optimizer help (v3)?** It fixed the collapse (val never went below 0.66) but
+  gained only 0.003 test mAP50, within noise, and app recall fell 0.581 → 0.573. v1 had already
+  converged; more epochs on the same data cannot add much. Kept v1.
 - **Why nano and not small, when small scored higher?** Small is 3.6× bigger and 2.3× slower, which
   means ~2 fps on the phone, and its recall at the app's thresholds is lower anyway.
 - **What did the ablations show?** 640 px is worth 6.7 points and augmentation 3.3. int8 is smaller

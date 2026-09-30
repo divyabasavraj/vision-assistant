@@ -1,0 +1,1157 @@
+{
+ "name": "n640_v3",
+ "weights": "training/runs/kaggle_v3/runs/n640_v3/weights/best.pt",
+ "imgsz": 640,
+ "test_images": 904,
+ "params": 2592765,
+ "standard": {
+  "map50": 0.67,
+  "map50_95": 0.467,
+  "precision": 0.72,
+  "recall": 0.622,
+  "per_class": {
+   "person": {
+    "precision": 0.708,
+    "recall": 0.478,
+    "ap50": 0.542,
+    "ap50_95": 0.346
+   },
+   "dog": {
+    "precision": 0.781,
+    "recall": 0.776,
+    "ap50": 0.846,
+    "ap50_95": 0.685
+   },
+   "car": {
+    "precision": 0.751,
+    "recall": 0.608,
+    "ap50": 0.688,
+    "ap50_95": 0.477
+   },
+   "bicycle": {
+    "precision": 0.574,
+    "recall": 0.439,
+    "ap50": 0.462,
+    "ap50_95": 0.33
+   },
+   "motorbike": {
+    "precision": 0.756,
+    "recall": 0.5,
+    "ap50": 0.596,
+    "ap50_95": 0.373
+   },
+   "auto": {
+    "precision": 0.713,
+    "recall": 0.603,
+    "ap50": 0.585,
+    "ap50_95": 0.409
+   },
+   "bus": {
+    "precision": 0.808,
+    "recall": 0.737,
+    "ap50": 0.813,
+    "ap50_95": 0.63
+   },
+   "stairs_up": {
+    "precision": 0.847,
+    "recall": 0.885,
+    "ap50": 0.92,
+    "ap50_95": 0.694
+   },
+   "stairs_down": {
+    "precision": 0.797,
+    "recall": 0.772,
+    "ap50": 0.796,
+    "ap50_95": 0.351
+   },
+   "curb": {
+    "precision": 0.563,
+    "recall": 0.47,
+    "ap50": 0.506,
+    "ap50_95": 0.348
+   },
+   "pole": {
+    "precision": 0.561,
+    "recall": 0.353,
+    "ap50": 0.474,
+    "ap50_95": 0.271
+   },
+   "chair": {
+    "precision": 0.663,
+    "recall": 0.662,
+    "ap50": 0.675,
+    "ap50_95": 0.459
+   },
+   "table": {
+    "precision": 0.774,
+    "recall": 0.565,
+    "ap50": 0.666,
+    "ap50_95": 0.384
+   },
+   "door": {
+    "precision": 0.88,
+    "recall": 0.943,
+    "ap50": 0.97,
+    "ap50_95": 0.865
+   },
+   "crosswalk": {
+    "precision": 0.627,
+    "recall": 0.535,
+    "ap50": 0.513,
+    "ap50_95": 0.384
+   }
+  }
+ },
+ "app_operating_point": {
+  "thresholds": {
+   "person": 0.4,
+   "dog": 0.35,
+   "car": 0.35,
+   "bicycle": 0.35,
+   "motorbike": 0.35,
+   "auto": 0.35,
+   "bus": 0.35,
+   "stairs_up": 0.35,
+   "stairs_down": 0.35,
+   "curb": 0.5,
+   "pole": 0.35,
+   "chair": 0.35,
+   "table": 0.35,
+   "door": 0.35,
+   "crosswalk": 0.35
+  },
+  "per_class": {
+   "person": {
+    "tp": 306,
+    "fp": 121,
+    "fn": 338,
+    "n": 644,
+    "precision": 0.717,
+    "recall": 0.475,
+    "f1": 0.571,
+    "recall_far": 0.215,
+    "recall_near": 0.676,
+    "recall_close": 0.81,
+    "n_far": 331,
+    "n_near": 139,
+    "n_close": 174
+   },
+   "dog": {
+    "tp": 63,
+    "fp": 10,
+    "fn": 22,
+    "n": 85,
+    "precision": 0.863,
+    "recall": 0.741,
+    "f1": 0.797,
+    "recall_far": null,
+    "recall_near": 0.5,
+    "recall_close": 0.759,
+    "n_far": 0,
+    "n_near": 6,
+    "n_close": 79
+   },
+   "car": {
+    "tp": 391,
+    "fp": 122,
+    "fn": 244,
+    "n": 635,
+    "precision": 0.762,
+    "recall": 0.616,
+    "f1": 0.681,
+    "recall_far": 0.533,
+    "recall_near": 0.653,
+    "recall_close": 0.92,
+    "n_far": 450,
+    "n_near": 72,
+    "n_close": 113
+   },
+   "bicycle": {
+    "tp": 45,
+    "fp": 36,
+    "fn": 53,
+    "n": 98,
+    "precision": 0.556,
+    "recall": 0.459,
+    "f1": 0.503,
+    "recall_far": 0.036,
+    "recall_near": 0.25,
+    "recall_close": 0.707,
+    "n_far": 28,
+    "n_near": 12,
+    "n_close": 58
+   },
+   "motorbike": {
+    "tp": 52,
+    "fp": 18,
+    "fn": 54,
+    "n": 106,
+    "precision": 0.743,
+    "recall": 0.491,
+    "f1": 0.591,
+    "recall_far": 0.111,
+    "recall_near": 0.44,
+    "recall_close": 0.822,
+    "n_far": 36,
+    "n_near": 25,
+    "n_close": 45
+   },
+   "auto": {
+    "tp": 17,
+    "fp": 9,
+    "fn": 16,
+    "n": 33,
+    "precision": 0.654,
+    "recall": 0.515,
+    "f1": 0.576,
+    "recall_far": 0.417,
+    "recall_near": 0.714,
+    "recall_close": 1.0,
+    "n_far": 24,
+    "n_near": 7,
+    "n_close": 2
+   },
+   "bus": {
+    "tp": 130,
+    "fp": 33,
+    "fn": 45,
+    "n": 175,
+    "precision": 0.798,
+    "recall": 0.743,
+    "f1": 0.769,
+    "recall_far": 0.655,
+    "recall_near": 0.911,
+    "recall_close": 1.0,
+    "n_far": 119,
+    "n_near": 45,
+    "n_close": 11
+   },
+   "stairs_up": {
+    "tp": 23,
+    "fp": 2,
+    "fn": 3,
+    "n": 26,
+    "precision": 0.92,
+    "recall": 0.885,
+    "f1": 0.902,
+    "recall_far": null,
+    "recall_near": 1.0,
+    "recall_close": 0.875,
+    "n_far": 0,
+    "n_near": 2,
+    "n_close": 24
+   },
+   "stairs_down": {
+    "tp": 45,
+    "fp": 8,
+    "fn": 12,
+    "n": 57,
+    "precision": 0.849,
+    "recall": 0.789,
+    "f1": 0.818,
+    "recall_far": null,
+    "recall_near": 0.636,
+    "recall_close": 0.886,
+    "n_far": 0,
+    "n_near": 22,
+    "n_close": 35
+   },
+   "curb": {
+    "tp": 48,
+    "fp": 25,
+    "fn": 52,
+    "n": 100,
+    "precision": 0.658,
+    "recall": 0.48,
+    "f1": 0.555,
+    "recall_far": 0.0,
+    "recall_near": 0.462,
+    "recall_close": 0.494,
+    "n_far": 2,
+    "n_near": 13,
+    "n_close": 85
+   },
+   "pole": {
+    "tp": 40,
+    "fp": 23,
+    "fn": 62,
+    "n": 102,
+    "precision": 0.635,
+    "recall": 0.392,
+    "f1": 0.485,
+    "recall_far": 0.128,
+    "recall_near": 0.409,
+    "recall_close": 0.895,
+    "n_far": 39,
+    "n_near": 44,
+    "n_close": 19
+   },
+   "chair": {
+    "tp": 45,
+    "fp": 36,
+    "fn": 23,
+    "n": 68,
+    "precision": 0.556,
+    "recall": 0.662,
+    "f1": 0.604,
+    "recall_far": 0.364,
+    "recall_near": 0.621,
+    "recall_close": 0.821,
+    "n_far": 11,
+    "n_near": 29,
+    "n_close": 28
+   },
+   "table": {
+    "tp": 23,
+    "fp": 2,
+    "fn": 23,
+    "n": 46,
+    "precision": 0.92,
+    "recall": 0.5,
+    "f1": 0.648,
+    "recall_far": 0.0,
+    "recall_near": 0.0,
+    "recall_close": 0.639,
+    "n_far": 2,
+    "n_near": 8,
+    "n_close": 36
+   },
+   "door": {
+    "tp": 51,
+    "fp": 3,
+    "fn": 2,
+    "n": 53,
+    "precision": 0.944,
+    "recall": 0.962,
+    "f1": 0.953,
+    "recall_far": null,
+    "recall_near": 1.0,
+    "recall_close": 0.957,
+    "n_far": 0,
+    "n_near": 7,
+    "n_close": 46
+   },
+   "crosswalk": {
+    "tp": 23,
+    "fp": 12,
+    "fn": 20,
+    "n": 43,
+    "precision": 0.657,
+    "recall": 0.535,
+    "f1": 0.59,
+    "recall_far": 0.0,
+    "recall_near": null,
+    "recall_close": 0.548,
+    "n_far": 1,
+    "n_near": 0,
+    "n_close": 42
+   },
+   "ALL": {
+    "precision": 0.739,
+    "recall": 0.573,
+    "recall_far": 0.396,
+    "recall_near": 0.624,
+    "recall_close": 0.778,
+    "n_far": 1043,
+    "n_near": 431,
+    "n_close": 797
+   }
+  }
+ },
+ "sweep": {
+  "0.25": {
+   "person": {
+    "precision": 0.612,
+    "recall": 0.547,
+    "recall_near": 0.77,
+    "recall_close": 0.851
+   },
+   "dog": {
+    "precision": 0.802,
+    "recall": 0.765,
+    "recall_near": 0.667,
+    "recall_close": 0.772
+   },
+   "car": {
+    "precision": 0.703,
+    "recall": 0.666,
+    "recall_near": 0.722,
+    "recall_close": 0.938
+   },
+   "bicycle": {
+    "precision": 0.505,
+    "recall": 0.48,
+    "recall_near": 0.25,
+    "recall_close": 0.741
+   },
+   "motorbike": {
+    "precision": 0.64,
+    "recall": 0.519,
+    "recall_near": 0.44,
+    "recall_close": 0.867
+   },
+   "auto": {
+    "precision": 0.548,
+    "recall": 0.515,
+    "recall_near": 0.714,
+    "recall_close": 1.0
+   },
+   "bus": {
+    "precision": 0.732,
+    "recall": 0.766,
+    "recall_near": 0.911,
+    "recall_close": 1.0
+   },
+   "stairs_up": {
+    "precision": 0.767,
+    "recall": 0.885,
+    "recall_near": 1.0,
+    "recall_close": 0.875
+   },
+   "stairs_down": {
+    "precision": 0.789,
+    "recall": 0.789,
+    "recall_near": 0.636,
+    "recall_close": 0.886
+   },
+   "curb": {
+    "precision": 0.478,
+    "recall": 0.55,
+    "recall_near": 0.538,
+    "recall_close": 0.565
+   },
+   "pole": {
+    "precision": 0.531,
+    "recall": 0.5,
+    "recall_near": 0.545,
+    "recall_close": 0.947
+   },
+   "chair": {
+    "precision": 0.505,
+    "recall": 0.691,
+    "recall_near": 0.69,
+    "recall_close": 0.821
+   },
+   "table": {
+    "precision": 0.781,
+    "recall": 0.543,
+    "recall_near": 0.0,
+    "recall_close": 0.694
+   },
+   "door": {
+    "precision": 0.911,
+    "recall": 0.962,
+    "recall_near": 1.0,
+    "recall_close": 0.957
+   },
+   "crosswalk": {
+    "precision": 0.59,
+    "recall": 0.535,
+    "recall_near": null,
+    "recall_close": 0.548
+   },
+   "ALL": {
+    "precision": 0.651,
+    "recall": 0.622,
+    "recall_near": 0.689,
+    "recall_close": 0.807
+   }
+  },
+  "0.3": {
+   "person": {
+    "precision": 0.656,
+    "recall": 0.52,
+    "recall_near": 0.734,
+    "recall_close": 0.839
+   },
+   "dog": {
+    "precision": 0.844,
+    "recall": 0.765,
+    "recall_near": 0.667,
+    "recall_close": 0.772
+   },
+   "car": {
+    "precision": 0.732,
+    "recall": 0.641,
+    "recall_near": 0.694,
+    "recall_close": 0.929
+   },
+   "bicycle": {
+    "precision": 0.541,
+    "recall": 0.469,
+    "recall_near": 0.25,
+    "recall_close": 0.724
+   },
+   "motorbike": {
+    "precision": 0.697,
+    "recall": 0.5,
+    "recall_near": 0.44,
+    "recall_close": 0.844
+   },
+   "auto": {
+    "precision": 0.63,
+    "recall": 0.515,
+    "recall_near": 0.714,
+    "recall_close": 1.0
+   },
+   "bus": {
+    "precision": 0.769,
+    "recall": 0.76,
+    "recall_near": 0.911,
+    "recall_close": 1.0
+   },
+   "stairs_up": {
+    "precision": 0.885,
+    "recall": 0.885,
+    "recall_near": 1.0,
+    "recall_close": 0.875
+   },
+   "stairs_down": {
+    "precision": 0.818,
+    "recall": 0.789,
+    "recall_near": 0.636,
+    "recall_close": 0.886
+   },
+   "curb": {
+    "precision": 0.52,
+    "recall": 0.52,
+    "recall_near": 0.538,
+    "recall_close": 0.529
+   },
+   "pole": {
+    "precision": 0.585,
+    "recall": 0.471,
+    "recall_near": 0.523,
+    "recall_close": 0.947
+   },
+   "chair": {
+    "precision": 0.528,
+    "recall": 0.691,
+    "recall_near": 0.69,
+    "recall_close": 0.821
+   },
+   "table": {
+    "precision": 0.833,
+    "recall": 0.543,
+    "recall_near": 0.0,
+    "recall_close": 0.694
+   },
+   "door": {
+    "precision": 0.944,
+    "recall": 0.962,
+    "recall_near": 1.0,
+    "recall_close": 0.957
+   },
+   "crosswalk": {
+    "precision": 0.605,
+    "recall": 0.535,
+    "recall_near": null,
+    "recall_close": 0.548
+   },
+   "ALL": {
+    "precision": 0.692,
+    "recall": 0.603,
+    "recall_near": 0.671,
+    "recall_close": 0.797
+   }
+  },
+  "0.35": {
+   "person": {
+    "precision": 0.689,
+    "recall": 0.502,
+    "recall_near": 0.705,
+    "recall_close": 0.822
+   },
+   "dog": {
+    "precision": 0.863,
+    "recall": 0.741,
+    "recall_near": 0.5,
+    "recall_close": 0.759
+   },
+   "car": {
+    "precision": 0.762,
+    "recall": 0.616,
+    "recall_near": 0.653,
+    "recall_close": 0.92
+   },
+   "bicycle": {
+    "precision": 0.556,
+    "recall": 0.459,
+    "recall_near": 0.25,
+    "recall_close": 0.707
+   },
+   "motorbike": {
+    "precision": 0.743,
+    "recall": 0.491,
+    "recall_near": 0.44,
+    "recall_close": 0.822
+   },
+   "auto": {
+    "precision": 0.654,
+    "recall": 0.515,
+    "recall_near": 0.714,
+    "recall_close": 1.0
+   },
+   "bus": {
+    "precision": 0.798,
+    "recall": 0.743,
+    "recall_near": 0.911,
+    "recall_close": 1.0
+   },
+   "stairs_up": {
+    "precision": 0.92,
+    "recall": 0.885,
+    "recall_near": 1.0,
+    "recall_close": 0.875
+   },
+   "stairs_down": {
+    "precision": 0.849,
+    "recall": 0.789,
+    "recall_near": 0.636,
+    "recall_close": 0.886
+   },
+   "curb": {
+    "precision": 0.549,
+    "recall": 0.5,
+    "recall_near": 0.462,
+    "recall_close": 0.518
+   },
+   "pole": {
+    "precision": 0.635,
+    "recall": 0.392,
+    "recall_near": 0.409,
+    "recall_close": 0.895
+   },
+   "chair": {
+    "precision": 0.556,
+    "recall": 0.662,
+    "recall_near": 0.621,
+    "recall_close": 0.821
+   },
+   "table": {
+    "precision": 0.92,
+    "recall": 0.5,
+    "recall_near": 0.0,
+    "recall_close": 0.639
+   },
+   "door": {
+    "precision": 0.944,
+    "recall": 0.962,
+    "recall_near": 1.0,
+    "recall_close": 0.957
+   },
+   "crosswalk": {
+    "precision": 0.657,
+    "recall": 0.535,
+    "recall_near": null,
+    "recall_close": 0.548
+   },
+   "ALL": {
+    "precision": 0.725,
+    "recall": 0.582,
+    "recall_near": 0.633,
+    "recall_close": 0.783
+   }
+  },
+  "0.4": {
+   "person": {
+    "precision": 0.717,
+    "recall": 0.475,
+    "recall_near": 0.676,
+    "recall_close": 0.81
+   },
+   "dog": {
+    "precision": 0.873,
+    "recall": 0.729,
+    "recall_near": 0.5,
+    "recall_close": 0.747
+   },
+   "car": {
+    "precision": 0.785,
+    "recall": 0.587,
+    "recall_near": 0.625,
+    "recall_close": 0.92
+   },
+   "bicycle": {
+    "precision": 0.603,
+    "recall": 0.449,
+    "recall_near": 0.25,
+    "recall_close": 0.69
+   },
+   "motorbike": {
+    "precision": 0.773,
+    "recall": 0.481,
+    "recall_near": 0.44,
+    "recall_close": 0.822
+   },
+   "auto": {
+    "precision": 0.667,
+    "recall": 0.485,
+    "recall_near": 0.714,
+    "recall_close": 1.0
+   },
+   "bus": {
+    "precision": 0.843,
+    "recall": 0.737,
+    "recall_near": 0.911,
+    "recall_close": 1.0
+   },
+   "stairs_up": {
+    "precision": 0.92,
+    "recall": 0.885,
+    "recall_near": 1.0,
+    "recall_close": 0.875
+   },
+   "stairs_down": {
+    "precision": 0.882,
+    "recall": 0.789,
+    "recall_near": 0.636,
+    "recall_close": 0.886
+   },
+   "curb": {
+    "precision": 0.588,
+    "recall": 0.5,
+    "recall_near": 0.462,
+    "recall_close": 0.518
+   },
+   "pole": {
+    "precision": 0.686,
+    "recall": 0.343,
+    "recall_near": 0.364,
+    "recall_close": 0.789
+   },
+   "chair": {
+    "precision": 0.577,
+    "recall": 0.662,
+    "recall_near": 0.621,
+    "recall_close": 0.821
+   },
+   "table": {
+    "precision": 0.957,
+    "recall": 0.478,
+    "recall_near": 0.0,
+    "recall_close": 0.611
+   },
+   "door": {
+    "precision": 0.943,
+    "recall": 0.943,
+    "recall_near": 1.0,
+    "recall_close": 0.935
+   },
+   "crosswalk": {
+    "precision": 0.657,
+    "recall": 0.535,
+    "recall_near": null,
+    "recall_close": 0.548
+   },
+   "ALL": {
+    "precision": 0.754,
+    "recall": 0.561,
+    "recall_near": 0.615,
+    "recall_close": 0.773
+   }
+  },
+  "0.45": {
+   "person": {
+    "precision": 0.736,
+    "recall": 0.455,
+    "recall_near": 0.655,
+    "recall_close": 0.782
+   },
+   "dog": {
+    "precision": 0.886,
+    "recall": 0.729,
+    "recall_near": 0.5,
+    "recall_close": 0.747
+   },
+   "car": {
+    "precision": 0.798,
+    "recall": 0.572,
+    "recall_near": 0.597,
+    "recall_close": 0.912
+   },
+   "bicycle": {
+    "precision": 0.642,
+    "recall": 0.439,
+    "recall_near": 0.167,
+    "recall_close": 0.69
+   },
+   "motorbike": {
+    "precision": 0.774,
+    "recall": 0.453,
+    "recall_near": 0.44,
+    "recall_close": 0.778
+   },
+   "auto": {
+    "precision": 0.619,
+    "recall": 0.394,
+    "recall_near": 0.571,
+    "recall_close": 1.0
+   },
+   "bus": {
+    "precision": 0.857,
+    "recall": 0.72,
+    "recall_near": 0.911,
+    "recall_close": 1.0
+   },
+   "stairs_up": {
+    "precision": 0.92,
+    "recall": 0.885,
+    "recall_near": 1.0,
+    "recall_close": 0.875
+   },
+   "stairs_down": {
+    "precision": 0.88,
+    "recall": 0.772,
+    "recall_near": 0.636,
+    "recall_close": 0.857
+   },
+   "curb": {
+    "precision": 0.633,
+    "recall": 0.5,
+    "recall_near": 0.462,
+    "recall_close": 0.518
+   },
+   "pole": {
+    "precision": 0.667,
+    "recall": 0.294,
+    "recall_near": 0.273,
+    "recall_close": 0.737
+   },
+   "chair": {
+    "precision": 0.616,
+    "recall": 0.662,
+    "recall_near": 0.621,
+    "recall_close": 0.821
+   },
+   "table": {
+    "precision": 0.95,
+    "recall": 0.413,
+    "recall_near": 0.0,
+    "recall_close": 0.528
+   },
+   "door": {
+    "precision": 0.943,
+    "recall": 0.943,
+    "recall_near": 1.0,
+    "recall_close": 0.935
+   },
+   "crosswalk": {
+    "precision": 0.636,
+    "recall": 0.488,
+    "recall_near": null,
+    "recall_close": 0.5
+   },
+   "ALL": {
+    "precision": 0.77,
+    "recall": 0.542,
+    "recall_near": 0.589,
+    "recall_close": 0.754
+   }
+  },
+  "0.5": {
+   "person": {
+    "precision": 0.759,
+    "recall": 0.436,
+    "recall_near": 0.655,
+    "recall_close": 0.753
+   },
+   "dog": {
+    "precision": 0.897,
+    "recall": 0.718,
+    "recall_near": 0.5,
+    "recall_close": 0.734
+   },
+   "car": {
+    "precision": 0.812,
+    "recall": 0.543,
+    "recall_near": 0.583,
+    "recall_close": 0.903
+   },
+   "bicycle": {
+    "precision": 0.672,
+    "recall": 0.439,
+    "recall_near": 0.167,
+    "recall_close": 0.69
+   },
+   "motorbike": {
+    "precision": 0.767,
+    "recall": 0.434,
+    "recall_near": 0.4,
+    "recall_close": 0.778
+   },
+   "auto": {
+    "precision": 0.722,
+    "recall": 0.394,
+    "recall_near": 0.571,
+    "recall_close": 1.0
+   },
+   "bus": {
+    "precision": 0.858,
+    "recall": 0.691,
+    "recall_near": 0.889,
+    "recall_close": 1.0
+   },
+   "stairs_up": {
+    "precision": 0.957,
+    "recall": 0.846,
+    "recall_near": 1.0,
+    "recall_close": 0.833
+   },
+   "stairs_down": {
+    "precision": 0.87,
+    "recall": 0.702,
+    "recall_near": 0.591,
+    "recall_close": 0.771
+   },
+   "curb": {
+    "precision": 0.658,
+    "recall": 0.48,
+    "recall_near": 0.462,
+    "recall_close": 0.494
+   },
+   "pole": {
+    "precision": 0.778,
+    "recall": 0.275,
+    "recall_near": 0.25,
+    "recall_close": 0.737
+   },
+   "chair": {
+    "precision": 0.652,
+    "recall": 0.662,
+    "recall_near": 0.621,
+    "recall_close": 0.821
+   },
+   "table": {
+    "precision": 0.95,
+    "recall": 0.413,
+    "recall_near": 0.0,
+    "recall_close": 0.528
+   },
+   "door": {
+    "precision": 0.943,
+    "recall": 0.943,
+    "recall_near": 1.0,
+    "recall_close": 0.935
+   },
+   "crosswalk": {
+    "precision": 0.667,
+    "recall": 0.465,
+    "recall_near": null,
+    "recall_close": 0.476
+   },
+   "ALL": {
+    "precision": 0.79,
+    "recall": 0.52,
+    "recall_near": 0.578,
+    "recall_close": 0.737
+   }
+  },
+  "0.55": {
+   "person": {
+    "precision": 0.758,
+    "recall": 0.399,
+    "recall_near": 0.619,
+    "recall_close": 0.713
+   },
+   "dog": {
+    "precision": 0.897,
+    "recall": 0.718,
+    "recall_near": 0.5,
+    "recall_close": 0.734
+   },
+   "car": {
+    "precision": 0.82,
+    "recall": 0.515,
+    "recall_near": 0.569,
+    "recall_close": 0.885
+   },
+   "bicycle": {
+    "precision": 0.694,
+    "recall": 0.439,
+    "recall_near": 0.167,
+    "recall_close": 0.69
+   },
+   "motorbike": {
+    "precision": 0.763,
+    "recall": 0.425,
+    "recall_near": 0.36,
+    "recall_close": 0.778
+   },
+   "auto": {
+    "precision": 0.706,
+    "recall": 0.364,
+    "recall_near": 0.429,
+    "recall_close": 1.0
+   },
+   "bus": {
+    "precision": 0.862,
+    "recall": 0.68,
+    "recall_near": 0.889,
+    "recall_close": 1.0
+   },
+   "stairs_up": {
+    "precision": 0.957,
+    "recall": 0.846,
+    "recall_near": 1.0,
+    "recall_close": 0.833
+   },
+   "stairs_down": {
+    "precision": 0.86,
+    "recall": 0.649,
+    "recall_near": 0.5,
+    "recall_close": 0.743
+   },
+   "curb": {
+    "precision": 0.681,
+    "recall": 0.47,
+    "recall_near": 0.385,
+    "recall_close": 0.494
+   },
+   "pole": {
+    "precision": 0.788,
+    "recall": 0.255,
+    "recall_near": 0.227,
+    "recall_close": 0.684
+   },
+   "chair": {
+    "precision": 0.692,
+    "recall": 0.662,
+    "recall_near": 0.621,
+    "recall_close": 0.821
+   },
+   "table": {
+    "precision": 0.944,
+    "recall": 0.37,
+    "recall_near": 0.0,
+    "recall_close": 0.472
+   },
+   "door": {
+    "precision": 0.962,
+    "recall": 0.943,
+    "recall_near": 1.0,
+    "recall_close": 0.935
+   },
+   "crosswalk": {
+    "precision": 0.679,
+    "recall": 0.442,
+    "recall_near": null,
+    "recall_close": 0.452
+   },
+   "ALL": {
+    "precision": 0.798,
+    "recall": 0.496,
+    "recall_near": 0.55,
+    "recall_close": 0.719
+   }
+  },
+  "0.6": {
+   "person": {
+    "precision": 0.778,
+    "recall": 0.37,
+    "recall_near": 0.583,
+    "recall_close": 0.69
+   },
+   "dog": {
+    "precision": 0.938,
+    "recall": 0.718,
+    "recall_near": 0.5,
+    "recall_close": 0.734
+   },
+   "car": {
+    "precision": 0.842,
+    "recall": 0.488,
+    "recall_near": 0.556,
+    "recall_close": 0.867
+   },
+   "bicycle": {
+    "precision": 0.729,
+    "recall": 0.439,
+    "recall_near": 0.167,
+    "recall_close": 0.69
+   },
+   "motorbike": {
+    "precision": 0.764,
+    "recall": 0.396,
+    "recall_near": 0.32,
+    "recall_close": 0.733
+   },
+   "auto": {
+    "precision": 0.733,
+    "recall": 0.333,
+    "recall_near": 0.429,
+    "recall_close": 1.0
+   },
+   "bus": {
+    "precision": 0.881,
+    "recall": 0.674,
+    "recall_near": 0.889,
+    "recall_close": 1.0
+   },
+   "stairs_up": {
+    "precision": 0.95,
+    "recall": 0.731,
+    "recall_near": 1.0,
+    "recall_close": 0.708
+   },
+   "stairs_down": {
+    "precision": 0.872,
+    "recall": 0.596,
+    "recall_near": 0.455,
+    "recall_close": 0.686
+   },
+   "curb": {
+    "precision": 0.759,
+    "recall": 0.44,
+    "recall_near": 0.308,
+    "recall_close": 0.471
+   },
+   "pole": {
+    "precision": 0.821,
+    "recall": 0.225,
+    "recall_near": 0.159,
+    "recall_close": 0.684
+   },
+   "chair": {
+    "precision": 0.683,
+    "recall": 0.632,
+    "recall_near": 0.621,
+    "recall_close": 0.786
+   },
+   "table": {
+    "precision": 0.944,
+    "recall": 0.37,
+    "recall_near": 0.0,
+    "recall_close": 0.472
+   },
+   "door": {
+    "precision": 0.961,
+    "recall": 0.925,
+    "recall_near": 1.0,
+    "recall_close": 0.913
+   },
+   "crosswalk": {
+    "precision": 0.667,
+    "recall": 0.372,
+    "recall_near": null,
+    "recall_close": 0.381
+   },
+   "ALL": {
+    "precision": 0.82,
+    "recall": 0.47,
+    "recall_near": 0.522,
+    "recall_close": 0.694
+   }
+  }
+ },
+ "deployment": {
+  "onnx": "training/runs/kaggle_v3/runs/n640_v3/weights/best.onnx",
+  "onnx_mb": 10.6,
+  "cpu_ms_median": 22.4,
+  "output_shape": [
+   1,
+   19,
+   8400
+  ]
+ }
+}

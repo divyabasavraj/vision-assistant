@@ -3,4 +3,5 @@ pyyaml
 pytest
 onnx
 onnxruntime
+onnxslim>=0.1.82     # graph simplification on ONNX export (Ultralytics simplify=True)
 roboflow>=1.1        # dataset download from Roboflow Universe (download_roboflow.py)
