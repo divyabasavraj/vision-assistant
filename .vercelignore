@@ -1,0 +1,5 @@
+# The app needs only the Next.js code and public/; keep datasets, runs and docs out of CLI uploads.
+training/
+docs/
+certificates/
+.venv/
