@@ -1,0 +1,22 @@
+{
+  "missed_close_curb": {
+    "image": "vip_image309_jpg.rf.9f96bed022a3e323610a347f07ccc8e3.jpg",
+    "note": "missed curb, box height 0.72 of frame"
+  },
+  "missed_close_person": {
+    "image": "sod_2c2fd627148571fc_jpg.rf.b8480a04e9fe3f04401580b21e34d872.jpg",
+    "note": "missed person, box height 1.00 of frame"
+  },
+  "missed_close_stairs": {
+    "image": "fukao_145_jpg.rf.47fc7c77a9f5fc2dca17cc79048d03a5.jpg",
+    "note": "missed stairs_up, box height 0.93 of frame"
+  },
+  "phantom": {
+    "image": "fukao_Asraf_47_jpg.rf.b52849a5cdb43c1344984f96e3af8ff5.jpg",
+    "note": "car at 0.93 over nothing labelled"
+  },
+  "wrong_class": {
+    "image": "fukao_124_jpg.rf.1fe124b5024bb28750a71a071760de27.jpg",
+    "note": "car called bus at 0.91"
+  }
+}

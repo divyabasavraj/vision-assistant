@@ -2,7 +2,7 @@
 
 **Purpose of this file:** one place that tells the whole story of the project so far — *what* was built, *why* it was built that way, *how* it works, what changed and when, what broke, and what each number means. Written so you can re-learn any part before the viva without opening the code.
 
-**Period covered:** 2026-09-11 (day 1) → 2026-09-22 (today). 31 commits, 70 passing unit tests, one trained model, one public deployment.
+**Period covered:** 2026-09-11 (day 1) → 2026-09-30. Three trained detector versions (v1 shipped), 73 passing unit tests, one public deployment. The report required by spec §7 is §9.
 
 Companion files: `docs/journal/` (daily entries), `docs/viva-prep.md` (Q&A), `docs/superpowers/specs/…design.md` (the spec), `docs/superpowers/plans/…build.md` (the 13-task plan), `training/results/REPORT.md` (dataset + results with figures).
 
@@ -300,6 +300,11 @@ test images through the real `/api/ask`: 28 right, 1 partly, 1 wrong; median 3.5
 Gemini's free quota (limits of 5 and 20 requests) sends questions to Groq, and that the fallback costs ~8 s
 because rate-limit errors are retried first (§8.12).
 
+**Task 12, same day.** The report is §9 of this log, following spec §7 item by item.
+`failure_cases.py` picks the worst mistake of each type by a rule; the most useful finding was
+that the top "phantom" is a real car the dataset never labelled, and that three of the six failures are
+close-up views unlike the training data.
+
 ---
 
 ## 3. Where things stand today
@@ -346,6 +351,8 @@ because rate-limit errors are retried first (§8.12).
 | `training/scripts/make_baseline_labels.py` | COCO-id labels for the baseline eval |
 | `training/scripts/threshold_sweep.py` / `person_threshold.py` / `recall_by_band.py` | The three measurement scripts behind the thresholds |
 | `training/scripts/make_sample_sheets.py` | Labelled contact sheets |
+| `training/scripts/evaluate.py` | Every evaluation number for one weights file |
+| `training/scripts/failure_cases.py` | Rule-picked failure images → `training/results/failures/` |
 | `training/train.ipynb` | The Colab notebook for `n640_v1` |
 | `training/results/` | `baseline_test.md`, `n640_v1.md`, `n640_v1/` (curves, matrices, json, weights), `threshold_sweep.md`, `person_threshold.md`, `recall_by_band.md`, `REPORT.md`, `samples/` |
 | `training/data/` | `raw/{vip,sod,fukao}`, `merged/`, `baseline/` (git-ignored) |
@@ -413,7 +420,7 @@ Vercel project `vision-assistant` (team *image-and-speech-recognition*). Every p
 - [x] **Task 9**: v2 trained (0.653, not shipped; v1 stays) and all four ablations run, 2026-09-30 (§8.8–8.9). Targeted data collection (distant stairs, hard negatives, curb) deferred as field work (Decision 4). Follow-up v3 = v1 + 30 epochs, SGD pinned, `lr0 0.001`, no warm-up, no oversampling: 0.670, not shipped (§8.8).
 - [~] **Task 10**: *dropped from scope 2026-09-30 to protect Tasks 11–13.* Was: wearable polish: Screen Wake Lock, earbud play/pause via Media Session, ARIA / screen-reader pass, blindfold test with a friend.
 - [x] **Task 11** (desk version, 2026-09-30): event log + Log button in the app; 30-image Q&A test through the real `/api/ask` with accuracy, latency and provider (§8.12). Walking clips and phone photos not done (no field work, by scope); the Log button is ready if a walk happens.
-- [ ] **Task 12** — report per spec §7 (nine items), slides, backup demo video.
+- [x] **Task 12** (2026-09-30): report per spec §7 as §9 of this log; 6 rule-picked failure cases (`failure_cases.py`). Slides and demo video not made, by scope.
 - [ ] **Task 13** — rehearse on the actual phone and Wi-Fi; re-read viva-prep; be able to explain every `lib/` file.
 - Open question: why does WebGPU not engage on iOS Safari (stuck on wasm at 5 fps)?
 
@@ -817,3 +824,150 @@ those retries off for Gemini; the remaining delay is Groq's own free-tier speed.
   fallback model. Median 3.5 s, p90 9.4 s; slow cases are all Gemini quota fall-throughs.
 - **What does the confusion matrix tell you?** Errors are misses (background column), not class
   confusions — so the fix is recall (more data, longer training, oversampling), not relabelling.
+
+---
+
+## 9. Report (spec §7, the nine items)
+
+*Task 12. The report required by spec §7, item by item, in the spec's order. Each item gives the
+result, then where the evidence lives. Most detail is already earlier in this log or in
+`training/results/REPORT.md` (the version with the figures inline); this section is the index a
+marker reads first. Status is honest: two of the nine were cut to a desk version by the scope
+decision of 2026-09-30 (no field work, no video).*
+
+**Problem and system, in one paragraph.** A phone worn on the chest runs a fine-tuned YOLO11n
+detector in the browser and speaks nearby obstacles in real time; a spoken "vision, …" sends one
+photo to a cloud vision-language model for anything the 15 classes cannot cover (text, scenes).
+Two tiers because real-time warnings need < 100 ms with no network, while reading and describing
+need a large model. Full picture: §0; design decisions: §5.
+
+### 9.1 Dataset summary — done
+
+9,035 images, 23,314 boxes, 15 classes, merged from three public Roboflow datasets (vip, sod-enect,
+Fukao), un-augmented versions only, deduplicated, split 80/10/10 with a fixed seed: **7,228 /
+903 / 904** images. Smallest class: auto (264 train boxes). Test split untouched until evaluation.
+
+- Per-class bar chart: `training/results/n640_v1/fig_class_counts.png`
+- Sample images with boxes (12 per split, regenerable with `--seed`): `training/results/samples/`
+- Merge method, leakage decisions (sod v1 not v2, Fukao dedupe, sod `stairs` unmapped): §2 Sep 13a
+- Numbers: §4, `training/data/merged/counts.json`
+
+### 9.2 Main results — done
+
+| | mAP50, all 15 | mAP50, 8 COCO classes | mAP50, 7 new classes |
+|---|---:|---:|---:|
+| YOLO11n COCO weights, no fine-tuning | 0.264 | 0.496 | 0 (cannot know them) |
+| **YOLO11n fine-tuned (v1, shipped)** | **0.667** | 0.665 (7 of 8 up; bicycle 0.48 → 0.45 the exception) | 0.670 |
+
+mAP50-95 0.462. Per-class AP, P, R, F1: §8.5. Recall where the app speaks: 0.773 close, 0.650
+near (§8.6). Two follow-up runs did not beat v1 (v2 0.653, v3 0.670 within noise with lower app
+recall; §8.8, §8.8b). Evidence: `training/results/n640_v1/n640_v1_test.json`,
+`baseline_test.md`, `n640_v1_eval.json`.
+
+### 9.3 Ablations — done (all four the spec lists)
+
+| change (one at a time, 12-epoch arms) | effect | verdict |
+|---|---|---|
+| image 640 → 320 px | −0.067 mAP50 | keep 640 |
+| nano → small | +0.041 mAP50, but 3.6× params, 2.3× CPU latency, lower app recall | keep nano |
+| augmentation on → off | −0.033 mAP50 | keep augmentation |
+| ONNX fp32 → int8 | 3.5× smaller (3.0 MB), ~30 % slower | keep fp32 |
+
+Detail and caveats: §8.9, `training/results/ablations.md`.
+
+### 9.4 Training curves — done
+
+Loss and mAP per epoch for v1: `training/results/n640_v1/results.png` (shown in `REPORT.md` §2).
+Val mAP50 0.321 at epoch 1 → 0.688 at epoch 50, val losses still falling: slightly under-trained,
+not overfitting. The v2 and v3 curves (`training/results/n640_v2/`, `n640_v3/`) are the evidence for
+the optimizer finding in §8.8–8.8b.
+
+### 9.5 Failure cases — done (6)
+
+Picked by a rule, not by browsing: `training/scripts/failure_cases.py` runs v1 at the app's
+thresholds over the test split and takes, for each failure type, the largest missed object or the
+most confident false box. Green = label, red = prediction. Images: `training/results/failures/`.
+
+| image | what happened | cause (one line) |
+|---|---|---|
+| `missed_close_curb.jpg` | curb filling 72 % of the frame, not detected | broken curb with debris, seen from above at a tilt; training curbs are clean edges at a distance |
+| `missed_close_stairs.jpg` | stairs filling the frame, not detected | seen straight down, no start or end in view; the model reads stairs from their outline, and here there is only texture |
+| `missed_close_person.jpg` | a face filling the frame, not detected | the body is cut off by the frame edge; training persons are mostly whole bodies (the same cut-off problem as the Sep 15 time-to-contact fix) |
+| `wrong_class.jpg` | a pickup truck (labelled car) called bus at 0.91 | no truck class: a large vehicle between car and bus falls to whichever is closer |
+| `phantom.jpg` | "car" at 0.93 over nothing labelled | **the model is right**: a real silver car the dataset never labelled. Some "false positives" are label errors (§8.10 item 2) |
+| `n640_v1/failure_camels_as_dogs.jpg` | camel herd called six dogs | closed set: camel is not a class, so the nearest class wins. The cloud Q&A answered it correctly |
+
+The pattern: three of six are **close-up views unlike the training data**, which matters because a
+chest camera sees things close up. That is the argument for collecting data from the wearer's
+viewpoint, listed under future work.
+
+### 9.6 Narration precision — partly done (no walking clips)
+
+**Not measured as specified.** The spec asks for 5–10 recorded walks scored useful / redundant /
+wrong under two threshold settings; walks were cut by the scope decision. What exists instead:
+
+- **Simulated crowd, 200 runs, nobody approaching:** false "coming at you fast" warnings 14 → 4
+  after the two-interval fix; a genuine 1 s approach with jitter still warns 96 / 100 (`fe6b4ce`, §2 Sep 15).
+- **Offline threshold comparison** (the two-setting part, on the test split instead of walks):
+  0.35 vs 0.50 global, mean F1 0.661 vs 0.642; per class in the narrator's bands (§2 Sep 14b,
+  `threshold_sweep.md`, `person_threshold.md`).
+- **Field observations:** every wrong phrase heard on informal walks was traced to a cause and fixed with a
+  test (§2 Sep 13j, Sep 15 table).
+- **Tooling ready:** the Log button (`lib/eventLog.ts`) records every phrase with a timestamp; one
+  walk plus the copied log gives the precision table.
+
+### 9.7 Q&A accuracy — done (desk version)
+
+30 held-out test images, 2 per class, through the real `/api/ask`: **28 right, 1 partly, 1 wrong**.
+Median 3.5 s, p90 9.4 s; Gemini alone median 3.0 s. The one wrong answer came from the fallback
+model. Deviation from spec: the images are the 15 navigation classes, not currency / medicine /
+label photos, because photographing those is field work. §8.12, `docs/eval/qa_sheet.csv`.
+
+### 9.8 End-to-end latency — partly done
+
+| stage | value | how measured |
+|---|---:|---|
+| model inference, laptop CPU | 21.9 ms | `evaluate.py` (onnxruntime, 2 threads) |
+| detection on the phone (iPhone 13, WASM) | ~200 ms per frame (5 fps) | on-screen fps, Sep 13 |
+| object appears → confirmed | ≈ 600 ms (3 frames at 5 fps) | derived from the 3-frame rule |
+| stairs, first seen → spoken (simulation) | median 0.4 s | crowd simulation, Sep 15 |
+| Q&A round-trip (question → answer text) | median 3.5 s, p90 9.4 s | desk test, §8.12 |
+
+So a warning reaches the user in well under a second, versus 3–4 s for a cloud answer; that
+ratio is why there are two tiers. **Not measured:** the text-to-speech start-up time on the phone,
+and a camera-to-speech stopwatch run on the device.
+
+### 9.9 Limitations — done
+
+The spec's list, each with where it is discussed:
+
+1. **Not a safety device.** It adds to a cane or guide dog, never replaces one. Recall close up is
+   0.77, so about 1 in 4 close objects is missed (§8.6).
+2. **Distance is estimated from box height** × a per-class size table, not measured. Cut-off boxes
+   break it (§2 Sep 15, first row).
+3. **Weak at night / in poor light.** Not measured; the datasets are mostly daylight.
+4. **Q&A needs internet**, and the free Gemini quota runs out after about 20 questions a day (§8.12).
+5. **Screen must stay on**, which drains the battery (Wake Lock was Task 10, dropped).
+6. **The trigger word can misfire** in noise, and always-on listening sends bystanders' speech to
+   Safari's cloud recogniser (hold mode exists for this, §2 Sep 13i).
+7. **No user study.** Tested by the developer only; no blind participant, no blindfold test.
+
+Plus the evaluation caveats in §8.10: thresholds were tuned on the test split, the merged labels
+are incomplete (see `phantom.jpg`), and small classes have wide error bars.
+
+### 9.10 Conclusion and future work
+
+A 2.6 M-parameter detector fine-tuned on 9k assembled images runs in a phone browser at 5 fps and
+raises mAP50 from 0.264 to 0.667 on held-out data. Every design choice survived an ablation. Two
+further training runs showed the model has converged on this data. The next gain has to come from
+**data**, not training:
+
+- images from a chest-height camera, especially close-up curbs, stairs and cut-off people (§9.5);
+- distant stairs (zero far-band stairs in the training set) and hard negatives (chair→person);
+- a truck class, and a relabelling pass for missed boxes.
+
+Then product work: the dropped Task 10 items (Wake Lock, earbud button, screen-reader pass, a
+blindfold test), a paid Q&A key, measured walks with the Log button, WebGPU on iOS for more fps,
+and a real user study with blind participants.
+
+**Not produced, by scope (2026-09-30):** slides and the backup demo video.
