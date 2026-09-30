@@ -62,7 +62,8 @@ floor-clutter→dog hard negatives, and curb. **None of it is in v2.** Every ite
 that do not exist in any of the three source datasets — there is not a single far-band stairs
 instance in the merged set, so no amount of re-training can teach distant stairs. Collecting and
 labelling them is field work, and it stays on the list for Task 11 rather than being quietly
-dropped. v2 is honestly described as "same data, trained longer".
+dropped. v2 is honestly described as "same images, trained longer, rare classes shown more
+often" (Decision 6).
 
 ## Decision 5 — the ablation protocol
 
@@ -91,3 +92,36 @@ Three protocol points worth being able to defend:
 
 Runner: `training/scripts/run_ablations.py` (one arm per invocation), queued by
 `training/scripts/run_queue.sh`.
+
+## Decision 6 — rare classes are oversampled in v2 (added 2026-09-30)
+
+*Revised after the Sep 22 local queue died at epoch 2 of v2 and produced nothing; v2 had not been
+trained when this was decided.*
+
+Box count alone does not predict AP here — door (408 boxes) scores 0.95 and stairs_up (326) 0.92,
+while bicycle (843), pole (1006) and curb (908) sit at 0.45–0.50. So imbalance is not the main
+cause of the weak classes; they are thin, small and far (Decision 2). It does plausibly hold back
+the two classes that are both **rare and weak**: auto (264 boxes, 143 images, AP50 0.544) and
+crosswalk (325, 0.520).
+
+v2 therefore trains on a **repeat-factor-sampled** train list (Gupta et al., LVIS 2019;
+`training/scripts/oversample.py`): class factor r_c = max(1, sqrt(t / f_c)) with t = 0.15, where
+f_c is the fraction of train images containing c; each image is repeated by the largest factor of
+its classes (capped at 4, stochastic rounding, seed 0). Val and test are untouched.
+
+| | before | after |
+|---|---:|---:|
+| train entries | 7,228 | 10,262 (+42 %) |
+| auto boxes | 264 | 747 |
+| crosswalk boxes | 325 | 601 |
+| chair boxes | 358 | 827 |
+| person boxes | 5,463 | 6,444 |
+
+Why oversampling and not the loss's `cls_pw` class weights (Ultralytics 8.4 has both): only one
+imbalance intervention per run, so a change in auto/crosswalk AP can be credited to it. `cls_pw`
+stays a candidate for a later run. The ablation arms are **not** oversampled — they still compare
+image size, model size and augmentation under Decision 5's protocol.
+
+**Hardware.** v2 and all ablation arms run on a Kaggle T4 (`training/kaggle/`), not the Mac.
+Every arm shares that hardware, so the arms stay comparable with each other; v1 vs v2 is compared
+on the same held-out test split, which is what matters for that comparison.

@@ -9,6 +9,8 @@ Question you should be able to answer: why must every ablation arm share the sam
 Usage   : training/.venv/bin/python training/scripts/run_ablations.py --name n640_v2 --epochs 30 \
               --base training/results/n640_v1/best.pt
           training/.venv/bin/python training/scripts/run_ablations.py --name n320_v2 --imgsz 320
+          On Kaggle: --device 0 --data /kaggle/working/merged/data.yaml --runs /kaggle/working/runs
+          --oversample 0.15 trains on the repeat-factor list from oversample.py (val/test untouched).
 """
 import argparse
 import json
@@ -34,6 +36,10 @@ def main() -> None:
     p.add_argument("--close-mosaic", type=int, default=None,
                    help="epochs at the end with mosaic off; default keeps v1's ratio of 20%% of epochs")
     p.add_argument("--no-aug", action="store_true", help="ablation C: turn augmentation off")
+    p.add_argument("--data", type=Path, default=DATA, help="dataset yaml")
+    p.add_argument("--runs", type=Path, default=RUNS, help="output directory")
+    p.add_argument("--oversample", type=float, default=None,
+                   help="repeat-factor threshold t for the train split (oversample.py); off by default")
     args = p.parse_args()
 
     from ultralytics import YOLO  # imported late so --help is instant
@@ -43,27 +49,41 @@ def main() -> None:
     # short run would spend almost all of its epochs with mosaic already switched off and the
     # augmentation ablation would compare two nearly-unaugmented arms.
     close_mosaic = args.close_mosaic if args.close_mosaic is not None else max(1, round(args.epochs * 0.2))
-    RUNS.mkdir(parents=True, exist_ok=True)
+    runs, data = args.runs, args.data
+    runs.mkdir(parents=True, exist_ok=True)
+    train_data = data
+    if args.oversample is not None:
+        import yaml
+        from oversample import write_list
+        cfg = yaml.safe_load(data.read_text())
+        root = Path(cfg.get("path") or data.parent)
+        if not root.is_absolute():
+            root = (data.parent / root).resolve()
+        lst = runs / f"{args.name}_train_rfs.txt"
+        write_list(root, args.oversample, lst)
+        cfg.update(path=str(root), train=str(lst.resolve()))
+        train_data = runs / f"{args.name}_data.yaml"
+        train_data.write_text(yaml.safe_dump(cfg, sort_keys=False))
 
     t0 = time.time()
     model = YOLO(args.base)
     model.train(
-        data=str(DATA), epochs=args.epochs, imgsz=args.imgsz, batch=args.batch,
+        data=str(train_data), epochs=args.epochs, imgsz=args.imgsz, batch=args.batch,
         patience=10, seed=0, device=args.device, workers=args.workers, close_mosaic=close_mosaic,
-        project=str(RUNS), name=args.name, exist_ok=True, plots=True, **extra,
+        project=str(runs), name=args.name, exist_ok=True, plots=True, **extra,
     )
     train_min = (time.time() - t0) / 60
 
-    best = YOLO(RUNS / args.name / "weights" / "best.pt")
-    m = best.val(data=str(DATA), split="test", imgsz=args.imgsz, device=args.device,
-                 project=str(RUNS), name=f"{args.name}_test", exist_ok=True)
+    best = YOLO(runs / args.name / "weights" / "best.pt")
+    m = best.val(data=str(data), split="test", imgsz=args.imgsz, device=args.device,
+                 project=str(runs), name=f"{args.name}_test", exist_ok=True)
     classes = [best.names[i] for i in range(len(best.names))]
     # ap50 / ap are indexed by the classes that actually appear in the split; maps is length-nc.
     present = list(getattr(m, "ap_class_index", getattr(m.box, "ap_class_index", range(len(classes)))))
     out = {
         "run": args.name, "base": args.base, "imgsz": args.imgsz, "epochs": args.epochs,
         "batch": args.batch, "augmentation": not args.no_aug, "device": args.device,
-        "close_mosaic": close_mosaic,
+        "close_mosaic": close_mosaic, "oversample": args.oversample,
         "train_minutes": round(train_min, 1),
         "params": sum(q.numel() for q in best.model.parameters()),
         "map50": float(m.box.map50), "map50_95": float(m.box.map),
@@ -71,7 +91,7 @@ def main() -> None:
         "per_class_map50_95": {classes[int(c)]: float(m.box.maps[int(c)]) for c in present},
         "speed_ms": m.speed,
     }
-    dst = RUNS / f"{args.name}_test.json"
+    dst = runs / f"{args.name}_test.json"
     dst.write_text(json.dumps(out, indent=2))
     print(f"{args.name}  mAP50 {out['map50']:.3f}  mAP50-95 {out['map50_95']:.3f}  ({train_min:.0f} min)")
     print("wrote", dst)

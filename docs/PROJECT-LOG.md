@@ -45,7 +45,8 @@ mic ──► speech-to-text ──► "vision, …"? ──► POST /api/ask �
 | Sep 15 | 5 | Five field-test fixes to approach/escape logic. Person threshold 0.40 (measured). Crowd simulation. Task 9 data analysis (stairs at distance, class sinks). | 6 |
 | Sep 16 | 6 | Production `/api/ask` was failing: API keys were never set in Vercel. Fixed and verified live. | 0 (config) |
 | Sep 19 | 9 | Learning walkthrough sessions; `questions-log.md` started. | 0 |
-| Sep 22 | 12 | Results report (`training/results/REPORT.md`), labelled sample sheets, this log. | pending |
+| Sep 22 | 12 | Results report (`training/results/REPORT.md`), labelled sample sheets, this log. Task 9 scaffolding (v2 decisions, ablation runner, int8). | 2 |
+| Sep 30 | 20 | Task 9 run on Kaggle T4: v2 (oversampled) 0.653 < v1 0.667, so **v1 stays shipped**. Four ablations: 640 px, nano and augmentation all justified. Unified `evaluate.py`. §8 evaluation study. | pending |
 
 (Days 2, 7, 8, 10, 11 had no project work recorded.)
 
@@ -268,6 +269,25 @@ No code. Step-by-step walkthrough of the whole project from fundamentals (`quest
 
 ---
 
+### Sep 30 — Day 20: Task 9 results (v2 and ablations)
+
+**What.** The overnight Mac queue from Sep 22 was too slow, so v2 and the four ablation arms were
+moved to Kaggle (free T4 GPU, two kernels in parallel, `training/kaggle/`). v2 gained rare-class
+oversampling first (`training/scripts/oversample.py`, repeat-factor sampling, Decision 6 in
+`v2_decisions.md`). Both kernels finished in ~1 h. One script, `training/scripts/evaluate.py`,
+now produces every evaluation number for any weights file.
+
+**Result.** v2 = 0.653 mAP50, below v1's 0.667. An automatic optimizer choice (SGD in v1 → AdamW in v2) plus
+re-run warm-up cost more than 30 epochs won back, and oversampling traded common-class recall for rare-class precision. **v1
+stays in `public/models/`**; no app change. Ablations: 320 px −0.067, augmentation off −0.033,
+yolo11s +0.041 but 2.3× slower and lower recall at the app thresholds. Full write-up §8.8–8.9.
+
+**Lesson.** A negative result is still a result if you can say why from the curves. When continuing
+from trained weights, pin the optimizer, lower the learning rate and skip warm-up; never leave
+`optimizer: auto`, because it changes with run length. Change one thing per run.
+
+---
+
 ## 3. Where things stand today
 
 ### The model
@@ -339,6 +359,10 @@ Vercel project `vision-assistant` (team *image-and-speech-recognition*). Every p
 | Crowd sim false "fast" warnings | 14 → 4 per 200 runs | commit `fe6b4ce` |
 | Phone fps (iPhone 13, wasm) | 5 | journal 2026-09-13 |
 | Q&A latency, Gemini / Groq | 3.5–4.5 s / 1.0 s | journal 2026-09-13 |
+| v2 test mAP50 / mAP50-95 | 0.653 / 0.447 (not shipped) | `training/results/n640_v2_eval.json` |
+| v2 app recall vs v1 | 0.535 vs 0.581 | same, and `n640_v1_eval.json` |
+| Ablation mAP50: control / 320 px / no aug / yolo11s | 0.634 / 0.567 / 0.601 / 0.675 | `training/results/ablation_runs/*_test.json` |
+| yolo11s ONNX / CPU latency | 37.9 MB / 47 ms (nano 10.6 MB / ~21 ms) | `training/results/s640_e12_eval.json` |
 | Unit tests | 70 | `npx vitest run` |
 
 ---
@@ -367,8 +391,8 @@ Vercel project `vision-assistant` (team *image-and-speech-recognition*). Every p
 
 ## 6. What is left (from the 13-task plan)
 
-- [ ] **Task 9** — second fine-tune (`n640_v2` from `best.pt`, longer) with targeted data: distant stairs, chair→person and clutter→dog hard negatives, curb. Ablations: 320 vs 640, nano vs small, aug on/off, fp32 vs int8. Swap in the best model.
-- [ ] **Task 10** — wearable polish: Screen Wake Lock, earbud play/pause via Media Session, ARIA / screen-reader pass, blindfold test with a friend.
+- [x] **Task 9**: v2 trained (0.653, not shipped; v1 stays) and all four ablations run, 2026-09-30 (§8.8–8.9). Targeted data collection (distant stairs, hard negatives, curb) deferred as field work (Decision 4). Possible follow-up if time allows: v3 = v1 + 30 epochs, SGD pinned, `lr0 0.001`, no warm-up, no oversampling.
+- [~] **Task 10**: *dropped from scope 2026-09-30 to protect Tasks 11–13.* Was: wearable polish: Screen Wake Lock, earbud play/pause via Media Session, ARIA / screen-reader pass, blindfold test with a friend.
 - [ ] **Task 11** — evaluation collection: debug log of every phrase and Q&A with timestamps; 5–10 walking clips scored useful/redundant/wrong; 30 Q&A photos; end-to-end latency.
 - [ ] **Task 12** — report per spec §7 (nine items), slides, backup demo video.
 - [ ] **Task 13** — rehearse on the actual phone and Wi-Fi; re-read viva-prep; be able to explain every `lib/` file.
@@ -391,3 +415,278 @@ Vercel project `vision-assistant` (team *image-and-speech-recognition*). Every p
 - **Time-to-contact** — how fast a box is growing tells you how soon you'll reach it, without knowing the real distance.
 - **EMA smoothing** — exponential moving average; each new value only partly moves the running estimate, so one noisy frame can't flip a decision.
 - **Closed-set detector** — it only knows its 15 classes; everything else gets the nearest class (camel → dog). The cloud model is the open-set backup.
+
+---
+
+## 8. Evaluation — every metric, what it means, and how to explain it
+
+*Study section. Every number here is measured on the **904-image test split** (2,271 labelled
+boxes) that training never saw, by `training/scripts/evaluate.py` — one script, one code path, so
+v1 and v2 are scored by identical arithmetic. Raw output: `training/results/<model>_eval.json`.
+The script reproduces v1's published numbers exactly (0.667 / 0.462 / close recall 0.773), which is
+the check that it is computing the same thing as before.*
+
+### 8.1 The building block: when is a box "correct"?
+
+A predicted box is a **true positive (TP)** if it has the **same class** as a labelled box and
+overlaps it with **IoU ≥ 0.5** (intersection ÷ union of the two boxes). Each labelled box can be
+claimed once — highest-scoring prediction first. What is left over:
+
+- **False positive (FP)** — a box the model drew that matches nothing (a false alarm).
+- **False negative (FN)** — a labelled object nobody claimed (a miss).
+
+There is no "true negative" in detection: the number of places where there is correctly *nothing*
+is infinite, which is why detectors are scored with precision and recall, never accuracy.
+
+### 8.2 Precision, recall, F1 — worked on curb (v1, at the shipped threshold 0.5)
+
+| | count | |
+|---|---:|---|
+| TP | 47 | curbs found |
+| FP | 22 | "curb" said where there was none |
+| FN | 53 | curbs missed |
+
+- **Precision** = TP ÷ (TP + FP) = 47 ÷ 69 = **0.681** — when it says curb, it is right 68 % of the time.
+- **Recall** = TP ÷ (TP + FN) = 47 ÷ 100 = **0.470** — it finds 47 % of the curbs.
+- **F1** = 2PR ÷ (P + R) = **0.556** — the harmonic mean, which is dragged toward the worse of the two.
+
+**The confidence threshold is the dial between them.** Every box comes with a score 0–1; raising
+the bar removes low-score boxes, so FPs fall (precision up) but some real objects are dropped too
+(recall down). Which way to turn it is a *product* decision: for a walking aid **a missed pole is
+worse than an imagined one**, so recall is favoured — that is why the global bar is 0.35, below
+the usual 0.5.
+
+### 8.3 AP and mAP — the threshold-free score
+
+- **AP (average precision)** for one class: slide the threshold from 1 down to 0, plot precision
+  against recall, take the **area under that curve**. It scores the model at *every* threshold at
+  once, so it does not depend on the bar we picked. (Ultralytics samples the curve at 101 recall
+  points, the COCO method.)
+- **mAP50** = the mean of the 15 per-class APs, with "correct" meaning IoU ≥ 0.5. v1: **0.667**.
+- **mAP50-95** = the same thing averaged over ten IoU bars 0.50, 0.55 … 0.95. A box has to be
+  *tight* to count at 0.9. v1: **0.462**.
+
+**Reading the gap between them.** A big gap means the model finds the object but draws a loose box.
+stairs_down: AP50 0.765 but AP50-95 0.344 — where a staircase "ends" is ambiguous, so boxes are
+rarely tight. door: 0.950 vs 0.840 — a door has crisp edges. For this app the loose box does not
+matter much (the narrator only uses box height and position), which is why **mAP50 is the headline
+number** and mAP50-95 the secondary one.
+
+**Why mAP and not accuracy?** (viva) Accuracy needs true negatives, which detection does not have;
+and mAP does not depend on a threshold choice, so two models can be compared fairly.
+
+### 8.4 Two sets of P/R — why they differ
+
+| | precision | recall | at which threshold |
+|---|---:|---:|---|
+| Ultralytics `val` (standard) | 0.737 | 0.602 | the one confidence that maximises mean F1 over classes |
+| App operating point | 0.737 | 0.581 | what the app actually ships: 0.35, curb 0.5, person 0.4 |
+
+The standard numbers are for comparing with other detectors; the app numbers are what the user
+actually experiences. Always say which one you are quoting.
+
+### 8.5 Per-class table (v1)
+
+| class | test boxes | AP50 | AP50-95 | P (app) | R (app) | F1 (app) |
+|---|---:|---:|---:|---:|---:|---:|
+| door | 53 | **0.950** | 0.840 | 0.925 | 0.925 | 0.925 |
+| stairs_up | 26 | **0.924** | 0.706 | 0.880 | 0.846 | 0.863 |
+| dog | 85 | 0.860 | 0.711 | 0.802 | 0.765 | 0.783 |
+| bus | 175 | 0.830 | 0.630 | 0.794 | 0.771 | 0.783 |
+| stairs_down | 57 | 0.765 | 0.344 | 0.811 | 0.754 | 0.782 |
+| car | 635 | 0.700 | 0.484 | 0.749 | 0.644 | 0.693 |
+| chair | 68 | 0.677 | 0.446 | 0.667 | 0.647 | 0.657 |
+| table | 46 | 0.638 | 0.358 | 0.875 | 0.457 | 0.600 |
+| motorbike | 106 | 0.597 | 0.364 | 0.720 | 0.509 | 0.597 |
+| person | 644 | 0.561 | 0.357 | 0.730 | 0.474 | 0.574 |
+| auto | 33 | 0.544 | 0.361 | 0.560 | 0.424 | 0.483 |
+| crosswalk | 43 | 0.520 | 0.394 | 0.615 | 0.558 | 0.585 |
+| curb | 100 | 0.502 | 0.341 | 0.681 | 0.470 | 0.556 |
+| pole | 102 | 0.487 | 0.280 | 0.627 | 0.412 | 0.497 |
+| bicycle | 98 | **0.453** | 0.316 | 0.577 | 0.459 | 0.511 |
+
+**How to explain the pattern.** Precision is fairly even (0.56–0.93); **recall is what separates
+good classes from weak ones.** The weak classes fail by *missing* objects, not by confusing them
+with other classes — the confusion matrix's off-diagonal cells are tiny (largest: auto→bus 0.12),
+while the background column (missed entirely) is 0.57 for curb, 0.50 for pole. They are thin
+(pole), flat (curb, crosswalk) or small and far (person, bicycle).
+
+**Box count does not predict AP.** door has 408 training boxes and scores 0.95; pole has 1,006 and
+scores 0.49. Visual difficulty matters more than quantity — which is why oversampling (§8.8) is
+expected to help auto and crosswalk, not pole and curb.
+
+**Error bars.** stairs_up has 26 test boxes: one more miss moves its recall by 0.04. Treat person
+(644), car (635), bus (175), pole (102), curb (100) as the load-bearing numbers.
+
+### 8.6 Recall by distance band — the product metric
+
+The narrator sorts each object into far / near / close by box height relative to the frame, scaled
+by the class's real size (`bucketOf()` in `lib/narrator.ts`). Far objects that are not straight
+ahead are never spoken. So:
+
+| band | boxes | recall (v1, app thresholds) | spoken? |
+|---|---:|---:|---|
+| far | 1,043 (46 %) | 0.406 | only if straight ahead |
+| near | 431 | 0.650 | yes |
+| close | 797 | **0.773** | yes, urgent |
+
+**How to say it:** "Flat recall is 0.58, but 46 % of the test boxes are far away and the app
+deliberately ignores most of them. On objects close enough to matter, recall is 0.77." Report both;
+quoting only one misleads in one direction or the other.
+
+Worst close-band class: **curb 0.482** — the model misses half the curbs right at your feet, and a
+curb matters most exactly when it is closest. Best: car 0.947, door 0.913.
+
+### 8.7 Baseline and deployment numbers
+
+| | value | what it shows |
+|---|---:|---|
+| COCO yolo11n, no fine-tuning, all 15 classes | mAP50 0.264 | it cannot know the 7 new classes at all |
+| … on the 8 classes COCO already has | 0.496 | even known classes improved with fine-tuning |
+| v1 fine-tuned | **0.667** | +0.40 absolute over baseline |
+| parameters | 2.59 M | "nano" |
+| ONNX file | 10.6 MB (int8: 3.0 MB) | fits a phone download |
+| CPU latency, Mac, 2 threads | 21.9 ms (int8: 27 ms) | the model itself is fast |
+| phone, iPhone 13 Safari (WASM) | ~5 fps | the browser runtime is the bottleneck, not the model |
+
+### 8.8 v1 → v2: what changed and what it bought
+
+**What v2 was.** 30 further epochs from `n640_v1/best.pt`, same images, same 640 px, batch 32,
+plus **repeat-factor oversampling** (LVIS rule, threshold 0.15): an image containing a rare class is
+listed more than once in the training list, so auto (the rarest, 264 boxes) is seen ~2.75× as
+often. Trained on a Kaggle T4 in 51 min, 2026-09-30. Reasoning: `v2_decisions.md`. Raw numbers:
+`training/results/n640_v2_eval.json`.
+
+**Result: v2 is worse, and v1 stays shipped.**
+
+| | v1 | v2 | change |
+|---|---:|---:|---:|
+| test mAP50 | **0.667** | 0.653 | −0.014 |
+| test mAP50-95 | **0.462** | 0.447 | −0.015 |
+| app precision | 0.737 | **0.757** | +0.020 |
+| app recall | **0.581** | 0.535 | −0.046 |
+| recall far / near / close | **0.406 / 0.650 / 0.773** | 0.353 / 0.599 / 0.739 | all down |
+| new-class mAP50 (7 non-COCO classes) | **0.670** | 0.662 | −0.008 |
+| ONNX / CPU latency | 10.6 MB / 21.9 ms | 10.6 MB / 20.1 ms | same architecture |
+
+Per class (test AP50):
+
+| class | v1 | v2 | | class | v1 | v2 |
+|---|---:|---:|---|---|---:|---:|
+| door | 0.950 | 0.979 | | person | 0.561 | 0.525 |
+| stairs_down | 0.765 | 0.787 | | dog | 0.860 | 0.824 |
+| curb | 0.502 | 0.522 | | bus | 0.830 | 0.797 |
+| bicycle | 0.453 | 0.464 | | motorbike | 0.597 | 0.551 |
+| table | 0.638 | 0.649 | | crosswalk | 0.520 | 0.492 |
+| auto | 0.544 | 0.552 | | **pole** | 0.487 | **0.400** |
+
+**Why it did not work — two causes, both visible in the files.**
+
+1. **The optimizer silently changed.** Both runs set `optimizer: auto`, which lets Ultralytics
+   ignore `lr0` and pick for itself by run length: over 10,000 iterations → SGD at 0.01, under →
+   AdamW at a computed rate. v1 (50 epochs × 226 batches = 11,300) got **SGD, lr 0.01**; v2 (30 ×
+   321 = 9,630) got **AdamW, lr 0.000526** (first lines of `training/results/n640_v2/train.log`).
+   So v2 continued v1's weights under a different optimizer, with its memory (momentum/moment
+   estimates) empty, plus 3 fresh warm-up epochs, whose bias learning rate starts at 0.1. That
+   jolt knocked the model out of where v1 had settled: val mAP50 fell from v1's 0.688 to **0.567
+   by epoch 3**, and the remaining 27 epochs were spent climbing back, reaching 0.682 at epoch 30,
+   still below where it started (`training/results/n640_v2/results.csv`). Decision 3 said "v1 was
+   still improving, so train longer". That was right, but continuing needs the *same* optimizer
+   at a *smaller* rate and no warm-up (v3: SGD, `lr0 0.001`, `warmup_epochs 0`), so the extra
+   epochs refine the weights instead of retraining them.
+2. **Oversampling moves the model's attention, it does not add information.** Showing rare-class
+   images more often means common classes are a smaller share of each epoch. The result is the
+   expected trade: rare classes became *more precise* (auto precision 0.56 → **0.77**, curb 0.68 →
+   0.80), but common classes lost recall (person 0.47 → 0.41, pole 0.41 → 0.31). The big losers,
+   pole and person, are frequent classes whose difficulty is visual (thin, far away), which
+   oversampling cannot fix.
+
+**Did auto overfit from being repeated 2.75×?** No sign of it. Overfitting would show as auto
+doing *better* on training images and *worse* on unseen test images. Its test AP50 went slightly
+up (0.544 → 0.552) and its test precision up sharply. Across all classes, val box and class losses fell
+steadily to the last epoch (1.166 / 1.159) with no upturn. With 33 test boxes, auto's ±0.01 is
+noise either way: oversampling neither hurt nor helped it measurably.
+
+**How to say it in the viva:** "v2 was an honest negative result. I changed two things at once:
+more epochs with oversampling, and it lost 1.4 points. The curves show why: an automatic setting switched the
+optimizer from SGD to AdamW and re-ran warm-up, which cost more than 30 epochs could win back, and oversampling traded common-class recall
+for rare-class precision, which is the wrong trade for a walking aid. So I kept v1. The fix is
+to pin the optimizer, fine-tune at a tenth of v1's learning rate with no warm-up, and change one
+thing at a time."
+
+### 8.9 Ablations: what each design choice was worth
+
+Four arms, each changing **one** thing against a control. All start from COCO weights, train **12
+epochs, batch 16, 640 px, seed 0**, and are scored on the same 904 test images. Trained on a Kaggle
+T4, 2026-09-30. (12 epochs, not v1's 50, so every arm sits below v1 in absolute terms. The
+comparison that matters is each arm against its control.)
+
+| arm | what differs | params | mAP50 | Δ vs control | mAP50-95 | new-class mAP50 | train |
+|---|---|---:|---:|---:|---:|---:|---:|
+| `n640_e12` *(control)* | — | 2.6 M | 0.634 | — | 0.429 | 0.609 | 15 min |
+| `n320_e12` | **A: image 320 px** | 2.6 M | 0.567 | **−0.067** | 0.380 | 0.528 | 10 min |
+| `s640_e12` | **B: yolo11s (small)** | 9.4 M | **0.675** | **+0.041** | 0.460 | 0.657 | 22 min |
+| `n640_noaug_e12` | **C: augmentation off** | 2.6 M | 0.601 | **−0.033** | 0.389 | 0.629 | 14 min |
+| v1 int8 | **D: int8 quantisation** | 2.6 M | — | — | — | — | none |
+
+- **A: image size is the most expensive thing to cut.** Halving the side to 320 px quarters
+  the pixels and loses 6.7 points, worst on the new classes (−0.08). The objects the app most needs
+  (curbs, poles, distant stairs) are small, and at 320 px they shrink to a handful of pixels.
+  **640 is justified.**
+- **B: the bigger model wins on mAP, but not where it counts.** yolo11s scores +0.041 over the
+  control and, even at 12 epochs, 0.675 against v1's 0.667. The cost: 3.6× the parameters, **37.9
+  MB ONNX** (vs 10.6) and **47 ms CPU** (vs ~21 ms, 2.3× slower). The phone already runs nano at ~5
+  fps, so small would drop to ~2 fps, too slow to warn about something approaching. And at the
+  app's thresholds, small's recall (0.565, close 0.762) is *below* v1's (0.581, close 0.773), so
+  its mAP edge does not reach the user. **Nano is justified by the phone, not by accuracy.**
+- **C: augmentation is worth 3.3 points overall.** Mosaic, flips, colour and scale jitter make the
+  model see each image in many versions, which stops it memorising. One surprise: with augmentation
+  off, the new-class mean is *higher* (0.629 vs 0.609). A plausible reading is that mosaic crops
+  and rescales thin or flat objects (curb, crosswalk) until they are unrecognisable. That is
+  worth one follow-up, not a conclusion, since at 12 epochs the arms have wide error bars.
+  **Augmentation on is justified.**
+- **D: int8 is 3.5× smaller (3.0 MB) but ~30 % slower on CPU** (27 vs 21 ms). Dynamic
+  quantisation converts activations back and forth at every layer, and Apple-silicon fp32 kernels
+  are already fast. A 10.6 MB download is acceptable, so **fp32 ships**. (Details: `ablations.md`.)
+
+**Conclusion: the shipped configuration survives every ablation.** YOLO11n at 640 px with default
+augmentation in fp32 is `n640_v1`, trained for 50 epochs. The only arm that beats it on mAP
+(small) loses on the phone and at the operating point. Raw per-arm results:
+`training/results/ablation_runs/*_test.json`; small's full evaluation:
+`training/results/s640_e12_eval.json`.
+
+### 8.10 Honest limitations to volunteer before you are asked
+
+1. **The shipped thresholds were chosen on the test split** (`threshold_sweep.py`,
+   `person_threshold.py` read test data). That makes the *app operating point* numbers (§8.4–8.6)
+   slightly optimistic. **mAP is unaffected** — it is threshold-free. The clean fix would have been
+   to tune thresholds on val; say so.
+2. **Labels come from three merged public datasets** with different habits (e.g. whether a bicycle
+   rider is also a "person"). Some "false positives" are unlabelled real objects, so true
+   precision is somewhat higher than measured.
+3. **Small classes have wide error bars** (stairs_up 26, auto 33 test boxes).
+4. **Closed set** — anything outside the 15 classes gets the nearest one (camel → dog). The cloud
+   Q&A tier is the open-set backup.
+5. **No end-user study.** Field walks by the developer, not a blind-user evaluation — future work.
+
+### 8.11 Viva questions on evaluation — short answers
+
+- **What is mAP50?** Mean over classes of the area under the precision–recall curve, counting a box
+  correct at IoU ≥ 0.5.
+- **Why is mAP50-95 lower?** It also demands tight boxes, up to 95 % overlap.
+- **Why not accuracy?** No true negatives in detection; mAP is threshold-free.
+- **Which matters more here, precision or recall?** Recall — a missed obstacle is worse than a false
+  warning. Hence 0.35, not 0.5.
+- **Why is person only 0.56 when it has the most data?** 51 % of test persons are tiny far figures;
+  close-band person recall is 0.82.
+- **Why is your test number honest?** Test split untouched during training and model selection
+  (best.pt is chosen on val); the one exception, threshold tuning, is disclosed in §8.10.
+- **Why is v2 worse than v1?** `optimizer: auto` switched SGD → AdamW for the shorter run and warm-up re-ran (val mAP fell 0.688 →
+  0.567 in 3 epochs, then only recovered to 0.682), and oversampling traded common-class recall for
+  rare-class precision. Negative result, kept v1.
+- **Why nano and not small, when small scored higher?** Small is 3.6× bigger and 2.3× slower, which
+  means ~2 fps on the phone, and its recall at the app's thresholds is lower anyway.
+- **What did the ablations show?** 640 px is worth 6.7 points and augmentation 3.3. int8 is smaller
+  but slower on this hardware. The shipped configuration survives every one.
+- **What does the confusion matrix tell you?** Errors are misses (background column), not class
+  confusions — so the fix is recall (more data, longer training, oversampling), not relabelling.
