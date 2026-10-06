@@ -722,6 +722,79 @@ augmentation in fp32 is `n640_v1`, trained for 50 epochs. The only arm that beat
 `training/results/ablation_runs/*_test.json`; small's full evaluation:
 `training/results/s640_e12_eval.json`.
 
+### 8.9b Other detector families: is the weak-class problem the data or the model?
+
+pole, curb, bicycle and crosswalk stayed weak through v1, v2, v3 and every ablation. Two readings
+fit that: the data cannot teach these classes any better (a data ceiling), or YOLO11n cannot learn
+what the data contains (a model ceiling). To tell them apart, two other detector families were
+trained under the §8.9 protocol: same data, 12 epochs, batch 16, 640 px, seed 0, `optimizer: auto`
+(AdamW, lr 0.000526, the same as the control) and the same 904 test images. Run on a Kaggle T4 on
+2026-10-06.
+
+- **YOLO26n**: the same size class as YOLO11n (2.5 M parameters), with a newer NMS-free head. It
+  tests whether a better small design fixes the problem.
+- **RT-DETR-l**: a transformer detector (32.8 M parameters). Attention lets each object query
+  look at the whole image. It tests whether a much stronger model finds more in the same data.
+
+| run | family | params | GFLOPs | mAP50 | Δ | mAP50-95 | new-class mAP50 | T4 inference | train |
+|---|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| `n640_e12` *(control)* | YOLO11n | 2.6 M | 6.5 | 0.634 | — | 0.429 | 0.609 | 3.8 ms | 15 min |
+| `s640_e12` *(§8.9 B)* | YOLO11s | 9.4 M | 21.7 | 0.675 | +0.041 | 0.460 | 0.657 | 9.4 ms | 22 min |
+| `y26n640_e12` | YOLO26n | 2.5 M | 5.9 | 0.646 | +0.013 | 0.443 | 0.606 | 3.8 ms | 18 min |
+| `rtdetrl640_e12` | RT-DETR-l | 32.8 M | 110 | **0.738** | **+0.104** | **0.526** | **0.730** | 38.2 ms | 91 min |
+
+**Per class, AP50 change against the control** (weak classes in bold):
+
+| class | control | YOLO11s | YOLO26n | RT-DETR-l | RT-DETR-l P / R |
+|---|---:|---:|---:|---:|---:|
+| **pole** | 0.409 | −0.008 | +0.022 | **+0.179** | 0.45 / **0.65** |
+| **curb** | 0.465 | +0.042 | +0.013 | **+0.122** | 0.52 / 0.54 |
+| **bicycle** | 0.515 | +0.021 | −0.001 | **+0.098** | 0.65 / 0.59 |
+| **crosswalk** | 0.461 | +0.022 | −0.048 | **+0.005** | 0.56 / 0.53 |
+| auto | 0.452 | +0.104 | −0.015 | +0.211 | 0.69 / 0.53 |
+| stairs_down | 0.702 | +0.105 | −0.028 | +0.162 | 0.94 / 0.84 |
+| motorbike | 0.529 | +0.055 | +0.039 | +0.153 | 0.78 / 0.60 |
+| stairs_up | 0.846 | +0.049 | +0.015 | +0.141 | 0.91 / 1.00 |
+| person | 0.556 | +0.028 | +0.034 | +0.067 | 0.67 / 0.54 |
+
+(The other six classes rise by 0.03–0.10 with RT-DETR-l. P/R are at Ultralytics' max-F1 point,
+not the app's thresholds.)
+
+**What it shows.**
+
+1. **A new design at the same size does not help.** YOLO26n gains 0.013 overall, which is within
+   12-epoch noise, and it moves no weak class by more than 0.05 in either direction. At the nano
+   budget the head design is not what limits these classes.
+2. **pole, curb and bicycle have more in the data than nano gets out.** RT-DETR-l lifts pole by
+   0.18, curb by 0.12 and bicycle by 0.10, from the same images and labels in the same 12 epochs.
+   For these three classes the data is not the ceiling. The gain is mostly **recall**: pole recall
+   0.65 against YOLO26n's 0.38. That fits §8.5, where the weak classes failed by missing objects.
+3. **crosswalk does not move with any model** (+0.005 with a 12.7× bigger transformer, −0.048
+   with YOLO26n). That makes crosswalk the one weak class that looks like a **data** problem. The
+   likely causes are its labels (three source datasets, with differing ideas of where a crosswalk
+   ends) and its size (43 test boxes).
+4. **The gain cannot be pinned on attention alone.** RT-DETR-l differs from the control in both
+   family and size (12.7× the parameters, 17× the compute). YOLO11s (3.6×) barely moves pole
+   (−0.008) or bicycle (+0.021), which hints that the transformer's whole-image view matters for
+   thin objects. But no arm here is a large CNN or a small transformer, so that is a hypothesis,
+   not a finding.
+5. **12 epochs probably understates RT-DETR-l.** Transformer detectors usually converge more
+   slowly than CNNs. Its +0.104 is likely a lower bound.
+
+**Why RT-DETR-l does not ship.** It needs 110 GFLOPs per frame against nano's 6.5 and takes 38 ms
+on a T4 GPU against 3.8 ms. As fp32 ONNX it would be about 128 MB (not exported). The phone runs
+nano at ~5 fps in WASM. Scaling by compute puts RT-DETR-l **below 0.5 fps** (an estimate, not
+measured), far too slow to warn about something approaching. **v1 stays shipped.**
+
+**What it changes.** §9.10 said the next gain must come from data. That holds for crosswalk. For
+pole, curb and bicycle, this run shows the current data supports a much better detector than the
+phone can run. The way to use that is **knowledge distillation**: train nano to copy RT-DETR-l's
+outputs, or use RT-DETR-l to pseudo-label unlabelled street images for nano. Both are future work.
+
+Raw results: `training/results/ablation_runs/{y26n640_e12,rtdetrl640_e12}_test.json` and
+`*_results.csv`. Job: `training/kaggle/push.sh arch`. Weights stay local
+(`training/runs/kaggle_arch/`, gitignored).
+
 ### 8.10 Honest limitations to volunteer before you are asked
 
 1. **The shipped thresholds were chosen on the test split** (`threshold_sweep.py`,
@@ -820,6 +893,10 @@ those retries off for Gemini; the remaining delay is Groq's own free-tier speed.
   means ~2 fps on the phone, and its recall at the app's thresholds is lower anyway.
 - **What did the ablations show?** 640 px is worth 6.7 points and augmentation 3.3. int8 is smaller
   but slower on this hardware. The shipped configuration survives every one.
+- **Are the weak classes a data or a model problem?** Mostly the model's capacity. RT-DETR-l on
+  the same data lifts pole +0.18, curb +0.12, bicycle +0.10; YOLO26n at nano size does nothing.
+  crosswalk stays flat with every model, so that one is data. RT-DETR-l is far too slow for the
+  phone; distilling it into nano is the future-work route (§8.9b).
 - **How accurate is the Q&A?** 28/30 right on held-out images (§8.12); the wrong one came from the
   fallback model. Median 3.5 s, p90 9.4 s; slow cases are all Gemini quota fall-throughs.
 - **What does the confusion matrix tell you?** Errors are misses (background column), not class
@@ -874,6 +951,11 @@ recall; §8.8, §8.8b). Evidence: `training/results/n640_v1/n640_v1_test.json`,
 | ONNX fp32 → int8 | 3.5× smaller (3.0 MB), ~30 % slower | keep fp32 |
 
 Detail and caveats: §8.9, `training/results/ablations.md`.
+
+**Beyond the spec: other detector families (§8.9b).** YOLO26n (same size, newer head) is level
+with the control (+0.013). RT-DETR-l, a 32.8 M-parameter transformer, gains +0.104, including
+pole +0.18, curb +0.12 and bicycle +0.10, but needs 17× the compute (under 0.5 fps on the phone,
+estimated). crosswalk does not improve with any model, so it is the one weak class limited by data.
 
 ### 9.4 Training curves — done
 
@@ -959,8 +1041,11 @@ are incomplete (see `phantom.jpg`), and small classes have wide error bars.
 
 A 2.6 M-parameter detector fine-tuned on 9k assembled images runs in a phone browser at 5 fps and
 raises mAP50 from 0.264 to 0.667 on held-out data. Every design choice survived an ablation. Two
-further training runs showed the model has converged on this data. The next gain has to come from
-**data**, not training:
+further training runs showed the model has converged on this data. A 12.7× larger transformer trained on the same
+data (§8.9b) lifts pole, curb and bicycle by 0.10–0.18, so for those three the data supports more
+than nano extracts. The way to use that on the phone is **distillation** from that model into nano.
+crosswalk did not improve with any model, so for it and the rest the next gain has to come from
+**data**:
 
 - images from a chest-height camera, especially close-up curbs, stairs and cut-off people (§9.5);
 - distant stairs (zero far-band stairs in the training set) and hard negatives (chair→person);

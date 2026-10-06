@@ -89,3 +89,22 @@ arm.**
 - **v2 (0.653) did not beat v1**: `optimizer: auto` switched SGD → AdamW and re-ran warm-up, which cost more than 30 epochs won back,
   and oversampling traded common-class recall for rare-class precision. Full analysis:
   `docs/PROJECT-LOG.md` §8.8.
+
+## Other detector families (2026-10-06)
+
+Same protocol (12 epochs, batch 16, 640 px, seed 0, AdamW 0.000526 via `auto`), Kaggle T4, job
+`push.sh arch`. Question: are the weak classes (pole, curb, bicycle, crosswalk) a data or a model
+problem?
+
+| run | family | params | GFLOPs | mAP50 | mAP50-95 | new-class mAP50 | T4 inference | pole | curb | bicycle | crosswalk |
+|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| n640_e12 *(control)* | YOLO11n | 2.6 M | 6.5 | 0.634 | 0.429 | 0.609 | 3.8 ms | 0.409 | 0.465 | 0.515 | 0.461 |
+| y26n640_e12 | YOLO26n | 2.5 M | 5.9 | 0.646 | 0.443 | 0.606 | 3.8 ms | 0.431 | 0.478 | 0.514 | 0.413 |
+| rtdetrl640_e12 | RT-DETR-l | 32.8 M | 110 | **0.738** | **0.526** | **0.730** | 38.2 ms | **0.588** | **0.587** | **0.613** | 0.466 |
+
+- **YOLO26n ≈ control.** A newer head at the same size does not fix the weak classes.
+- **RT-DETR-l +0.104**, mostly via recall. The same data supports much better pole, curb and
+  bicycle, so for those three nano's capacity is the limit, not the data.
+- **crosswalk is flat for every model**, so it is limited by data or labels.
+- Not shipped: 17× nano's compute, under 0.5 fps on the phone (estimated). Future work: distil it
+  into nano. Full analysis: `docs/PROJECT-LOG.md` §8.9b.
