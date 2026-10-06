@@ -1,7 +1,8 @@
 """
 Purpose : Kaggle driver for Task 9 — unpack the merged dataset from the private Kaggle dataset
           `divyabasavraj25/vision-assistant-merged`, then run one job's arms with
-          run_ablations.py on the T4. JOB = "v2" / "v3" (candidates) or "ablations" (4 arms).
+          run_ablations.py on the T4. JOB = "v2" / "v3" (candidates), "ablations" (4 arms) or
+          "arch" (two other detector families under the ablation protocol).
 Depends : Kaggle GPU (T4) + internet (pip ultralytics, COCO weights). Everything lands in
           /kaggle/working/runs, which is what `kaggle kernels output` downloads.
 Question you should be able to answer: why is v2 a separate Kaggle run from the ablations?
@@ -98,6 +99,15 @@ elif JOB == "ablations":
     run("n640_noaug_e12", "--epochs", "12", "--batch", "16", "--no-aug")
     if not run("s640_e12", "--base", "yolo11s.pt", "--epochs", "12", "--batch", "16"):
         run("s640_e12_b8", "--base", "yolo11s.pt", "--epochs", "12", "--batch", "8")
+elif JOB == "arch":
+    # Is the weak-class problem the data or the architecture? Two other detector families under
+    # the ablation protocol, compared with n640_e12: YOLO26n (same size class, NMS-free head) and
+    # RT-DETR-l (a transformer). 'auto' picks AdamW lr 0.000526 below 10k iterations, as it did
+    # for the control; batch 8 doubles the iterations past 10k (-> MuSGD), so the fallback pins it.
+    run("y26n640_e12", "--base", "yolo26n.pt", "--epochs", "12", "--batch", "16")
+    if not run("rtdetrl640_e12", "--base", "rtdetr-l.pt", "--epochs", "12", "--batch", "16"):
+        run("rtdetrl640_e12_b8", "--base", "rtdetr-l.pt", "--epochs", "12", "--batch", "8",
+            "--optimizer", "AdamW", "--lr0", "0.000526")
 say("DONE")
 for j in sorted(RUNS.glob("*_test.json")):
     print(j.name, j.read_text()[:400])

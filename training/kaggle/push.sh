@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # Purpose : Push train_kaggle.py to Kaggle as a private T4 script kernel for one job.
-# Usage   : training/kaggle/push.sh v2 | v3 | ablations
+# Usage   : training/kaggle/push.sh v2 | v3 | ablations | arch
 #           then: uvx kaggle kernels status divyabasavraj25/vision-<job>
 #                 uvx kaggle kernels output divyabasavraj25/vision-<job> -p training/runs/kaggle_<job>
 set -euo pipefail
-JOB="${1:?usage: push.sh v2|v3|ablations}"
+JOB="${1:?usage: push.sh v2|v3|ablations|arch}"
 HERE="$(cd "$(dirname "$0")" && pwd)"
 TMP="$(mktemp -d)"
 SCRIPTS="$HERE/../scripts"

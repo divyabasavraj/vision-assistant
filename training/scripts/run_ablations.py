@@ -100,6 +100,8 @@ def main() -> None:
         "map50": float(m.box.map50), "map50_95": float(m.box.map),
         "per_class_map50": {classes[int(c)]: float(a) for c, a in zip(present, m.box.ap50)},
         "per_class_map50_95": {classes[int(c)]: float(m.box.maps[int(c)]) for c in present},
+        "per_class_p": {classes[int(c)]: float(v) for c, v in zip(present, m.box.p)},
+        "per_class_r": {classes[int(c)]: float(v) for c, v in zip(present, m.box.r)},
         "speed_ms": m.speed,
     }
     dst = runs / f"{args.name}_test.json"
